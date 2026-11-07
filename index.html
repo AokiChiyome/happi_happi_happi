@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Hôm Nay Em Muốn Ăn Gì? 💕 Vòng Quay Hẹn Hò</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍱</text></svg>">
+  
+  <!-- Cute Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Floating background kawaii doodles -->
+  <div class="doodle-bg" aria-hidden="true">
+    <span class="doodle d-1">🍣</span>
+    <span class="doodle d-2">🧋</span>
+    <span class="doodle d-3">🍓</span>
+    <span class="doodle d-4">🍗</span>
+    <span class="doodle d-5">🍕</span>
+    <span class="doodle d-6">🍜</span>
+    <span class="doodle d-7">🍦</span>
+    <span class="doodle d-8">🍡</span>
+    <span class="doodle d-9">💖</span>
+    <span class="doodle d-10">✨</span>
+    <span class="doodle d-11">🥟</span>
+    <span class="doodle d-12">🥞</span>
+  </div>
+
+  <div class="app-container">
+    <!-- Top Header -->
+    <header class="app-header">
+      <div class="couple-badge" id="coupleBadgeBtn" title="Bấm để đổi tên chúng mình">
+        <span class="heart-icon">👩‍❤️‍👨</span>
+        <span class="couple-names" id="coupleNamesDisplay">Gấu Đực &amp; Bé Mèo</span>
+        <span class="edit-hint">✏️</span>
+      </div>
+
+      <div class="header-controls">
+        <button id="soundToggleBtn" class="cute-icon-btn" title="Bật/Tắt âm thanh">
+          <span id="soundIcon">🔊</span>
+        </button>
+        <button id="menuManageBtn" class="cute-icon-btn" title="Danh sách món ăn & CSV">
+          <span>📋</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Title Card -->
+    <section class="hero-card">
+      <div class="speech-bubble">
+        <span class="bubble-tail"></span>
+        <p id="heroDialogue">"Anh ơi, hôm nay ăn gì cũng được..." 🥹👉👈</p>
+      </div>
+      <h1 class="main-title">
+        <span class="title-sub">Giải Cứu Câu Hỏi Bất Hủ</span>
+        <span class="title-main">Hôm Nay Ăn Gì Bé Ơi? ✨</span>
+      </h1>
+      <p class="hero-desc">Mở hòm CS:GO phiên bản ẩm thực tình yêu — 2 vòng quay định đoạt bữa ăn!</p>
+      
+      <!-- Progress tracker pills -->
+      <div class="stage-stepper">
+        <div class="step-pill active" id="stepPill1">
+          <span class="step-num">1</span>
+          <span class="step-label">Chọn Thể Loại</span>
+        </div>
+        <div class="step-divider">💖</div>
+        <div class="step-pill" id="stepPill2">
+          <span class="step-num">2</span>
+          <span class="step-label">Chọn Món Cụ Thể</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= STAGE 1: CATEGORY ROLL ================= -->
+    <main id="stage1Section" class="stage-section active">
+      <div class="case-box">
+        <div class="case-header">
+          <div class="case-title-wrap">
+            <span class="case-icon">📦</span>
+            <div>
+              <h2 class="case-title">Hòm Thể Loại Ẩm Thực</h2>
+              <span class="case-subtitle">Vòng 1: Lẩu, Nướng, Chiên Xào hay Ăn Vặt?</span>
+            </div>
+          </div>
+          <div class="case-stats" id="catCountBadge">10 Thể loại</div>
+        </div>
+
+        <!-- CS:GO Roulette Viewport -->
+        <div class="roulette-viewport" id="categoryRoulette">
+          <!-- Center pointer marker (CS:GO style with cute heart) -->
+          <div class="needle-marker top-needle">
+            <div class="needle-heart">🔻</div>
+            <div class="needle-line"></div>
+          </div>
+          <div class="needle-marker bottom-needle">
+            <div class="needle-line"></div>
+            <div class="needle-heart">🔺</div>
+          </div>
+
+          <!-- Moving Track -->
+          <div class="roulette-track" id="categoryTrack">
+            <!-- Cards will be populated by JS -->
+          </div>
+        </div>
+
+        <!-- Control Action Bar -->
+        <div class="case-actions">
+          <button id="rollCategoryBtn" class="cute-btn btn-primary btn-large">
+            <span class="btn-emoji">🎲</span>
+            <span class="btn-text">Quay Thể Loại Ngay!</span>
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- ================= STAGE 2: DISH ROLL ================= -->
+    <main id="stage2Section" class="stage-section hidden">
+      <div class="case-box">
+        <div class="case-header">
+          <div class="case-title-wrap">
+            <span class="case-icon" id="stage2CategoryEmoji">🥩</span>
+            <div>
+              <h2 class="case-title" id="stage2CategoryTitle">Hòm Món Nướng</h2>
+              <span class="case-subtitle">Vòng 2: Mở hòm tìm món cụ thể nào!</span>
+            </div>
+          </div>
+          <button id="backToStage1Btn" class="cute-btn btn-outline btn-small" title="Đổi thể loại khác">
+            ↩️ Đổi Thể Loại
+          </button>
+        </div>
+
+        <!-- CS:GO Roulette Viewport for Dishes -->
+        <div class="roulette-viewport" id="dishRoulette">
+          <div class="needle-marker top-needle">
+            <div class="needle-heart">🔻</div>
+            <div class="needle-line"></div>
+          </div>
+          <div class="needle-marker bottom-needle">
+            <div class="needle-line"></div>
+            <div class="needle-heart">🔺</div>
+          </div>
+
+          <!-- Moving Track -->
+          <div class="roulette-track" id="dishTrack">
+            <!-- Dishes populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Control Action Bar -->
+        <div class="case-actions">
+          <button id="rollDishBtn" class="cute-btn btn-primary btn-large">
+            <span class="btn-emoji">🍗</span>
+            <span class="btn-text">Mở Hòm Món Ăn Này!</span>
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- ================= RESULT CELEBRATION MODAL ================= -->
+    <div id="resultModal" class="modal-overlay hidden">
+      <div class="modal-card result-card">
+        <div class="confetti-container" id="confettiContainer"></div>
+        <div class="result-banner">🎉 ĐÃ CÓ KẾT QUẢ RỒI NÈ! 🎉</div>
+        
+        <div class="result-dish-showcase">
+          <div class="result-emoji-bubble" id="resultEmoji">🥘</div>
+          <div class="result-category-tag" id="resultCategoryTag">Món Lẩu</div>
+          <h2 class="result-dish-name" id="resultDishName">Lẩu Thái Tomyum Chua Cay</h2>
+          <p class="result-dish-desc" id="resultDishDesc">Nước lẩu cốt dừa chua cay đẫm tôm mực bò Mỹ</p>
+        </div>
+
+        <div class="couple-decision-quote">
+          <span class="quote-icon">💌</span>
+          <span id="coupleQuoteText">"Kèo này chốt hạ! Không được bảo ăn gì cũng được nữa nhé!"</span>
+        </div>
+
+        <div class="result-action-grid">
+          <a id="findMapBtn" class="cute-btn btn-success" target="_blank" rel="noopener">
+            📍 Tìm Quán Quanh Đây
+          </a>
+          <button id="acceptMealBtn" class="cute-btn btn-primary">
+            🛵 Chốt Đơn! Đi Luôn
+          </button>
+          <button id="rerollDishBtn" class="cute-btn btn-outline">
+            🔄 Người Yêu Chê? Quay Lại Món Khác
+          </button>
+          <button id="resetAllBtn" class="cute-btn btn-text-only">
+            ↩️ Chọn Lại Thể Loại Ban Đầu
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= CATEGORY WON MODAL (INTERMEDIATE) ================= -->
+    <div id="categoryResultModal" class="modal-overlay hidden">
+      <div class="modal-card category-win-card">
+        <div class="win-sparkles">✨ 🎯 ✨</div>
+        <div class="result-banner">VÒNG 1 ĐÃ CHỐT!</div>
+        
+        <div class="category-win-display">
+          <div class="cat-win-emoji" id="catWinEmoji">🥩</div>
+          <h2 class="cat-win-name" id="catWinName">Món Nướng</h2>
+          <p class="cat-win-count" id="catWinCount">Đang có 10 món siêu ngon đang chờ mở hòm...</p>
+        </div>
+
+        <p class="cat-win-prompt">Bước 2: Chuẩn bị mở hòm các món thuộc thể loại này nhé! 🔥</p>
+
+        <div class="result-action-grid">
+          <button id="proceedToStage2Btn" class="cute-btn btn-primary btn-large">
+            Tiếp Tục: Mở Hòm Món Ăn 🎁
+          </button>
+          <button id="rerollCategoryBtn" class="cute-btn btn-outline">
+            🎲 Chưa Thích Thể Loại Này? Quay Lại
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= MANAGE MENU & CSV MODAL ================= -->
+    <div id="manageModal" class="modal-overlay hidden">
+      <div class="modal-card manage-card">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <span class="modal-icon">📜</span>
+            <div>
+              <h3>Thực Đơn Tình Yêu &amp; Dữ Liệu CSV</h3>
+              <p>Quản lý các thể loại &amp; món ăn cho hai đứa</p>
+            </div>
+          </div>
+          <button id="closeManageBtn" class="close-btn" aria-label="Đóng">&times;</button>
+        </div>
+
+        <!-- Tab switches -->
+        <div class="modal-tabs">
+          <button class="tab-btn active" data-tab="tab-list">📋 Danh Sách Món (<span id="totalDishesCount">0</span>)</button>
+          <button class="tab-btn" data-tab="tab-add">➕ Thêm Món Mới</button>
+          <button class="tab-btn" data-tab="tab-csv">📁 Quản Lý File CSV</button>
+        </div>
+
+        <div class="tab-content" id="tab-list">
+          <div class="filter-bar">
+            <select id="categoryFilter" class="cute-select">
+              <option value="all">Tất cả thể loại</option>
+            </select>
+            <input type="text" id="dishSearchInput" class="cute-input" placeholder="🔍 Tìm món ngon...">
+          </div>
+          <div class="dishes-list-container" id="dishesListContainer">
+            <!-- Rendered via JS -->
+          </div>
+        </div>
+
+        <div class="tab-content hidden" id="tab-add">
+          <form id="addDishForm" class="cute-form">
+            <div class="form-group">
+              <label>Thể Loại <span class="req">*</span></label>
+              <div class="input-with-action">
+                <select id="newDishCategory" class="cute-select" required>
+                  <!-- Categories options -->
+                </select>
+                <input type="text" id="newCategoryInput" class="cute-input hidden" placeholder="Nhập tên thể loại mới...">
+                <button type="button" id="toggleNewCategoryBtn" class="cute-btn btn-outline btn-small">
+                  ➕ Thể loại mới
+                </button>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label>Tên Món Ăn <span class="req">*</span></label>
+                <input type="text" id="newDishName" class="cute-input" placeholder="Ví dụ: Bò Nướng Tảng Sốt Phô Mai" required>
+              </div>
+              <div class="form-group w-emoji">
+                <label>Emoji</label>
+                <input type="text" id="newDishEmoji" class="cute-input emoji-input" value="🍲" maxlength="2">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Mô Tả Hương Vị / Lời Nhắn</label>
+              <input type="text" id="newDishDesc" class="cute-input" placeholder="Ví dụ: Thịt bò mềm mọng, phô mai kéo sợi thơm phức">
+            </div>
+
+            <div class="form-group">
+              <label>Thẻ Tag</label>
+              <input type="text" id="newDishTag" class="cute-input" placeholder="Ví dụ: Món Tủ Của Bé, Đậm Đà, Cay Cay">
+            </div>
+
+            <button type="submit" class="cute-btn btn-primary w-100">
+              💖 Thêm Ngay Vào Thực Đơn
+            </button>
+          </form>
+        </div>
+
+        <div class="tab-content hidden" id="tab-csv">
+          <div class="csv-manager-box">
+            <div class="csv-info-badge">
+              <span>📄</span>
+              <div>
+                <strong>File Dữ Liệu:</strong> <code>foods.csv</code>
+                <p>Bạn có thể chỉnh sửa trực tiếp file <code>foods.csv</code> trong thư mục dự án bằng Excel / Notepad hoặc tải lên file CSV mới ở đây.</p>
+              </div>
+            </div>
+
+            <div class="csv-buttons-row">
+              <button id="reloadCsvBtn" class="cute-btn btn-outline">
+                🔄 Tải Lại Từ foods.csv
+              </button>
+              <button id="exportCsvBtn" class="cute-btn btn-success">
+                💾 Xuất &amp; Tải CSV Về Máy
+              </button>
+              <label class="cute-btn btn-primary file-upload-label">
+                📂 Tải File CSV Mới Lên
+                <input type="file" id="importCsvInput" accept=".csv" style="display: none;">
+              </label>
+              <button id="resetDefaultBtn" class="cute-btn btn-text-only text-danger">
+                ⚠️ Khôi Phục Mặc Định Gốc
+              </button>
+            </div>
+
+            <div class="csv-preview-wrap">
+              <label class="csv-preview-label">Xem nhanh nội dung CSV hiện tại:</label>
+              <textarea id="csvPreviewArea" class="csv-textarea" readonly rows="8"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= EDIT COUPLE NAMES MODAL ================= -->
+    <div id="coupleNameModal" class="modal-overlay hidden">
+      <div class="modal-card small-card">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <span class="modal-icon">👩‍❤️‍👨</span>
+            <div>
+              <h3>Tên Đôi Mình</h3>
+              <p>Để giao diện gọi đúng nickname ngọt ngào của hai bạn nha</p>
+            </div>
+          </div>
+          <button id="closeCoupleModalBtn" class="close-btn">&times;</button>
+        </div>
+        <form id="coupleNameForm" class="cute-form">
+          <div class="form-group">
+            <label>Nickname Bạn Nam / Bạn 1:</label>
+            <input type="text" id="name1Input" class="cute-input" value="Gấu Đực" required maxlength="20">
+          </div>
+          <div class="form-group">
+            <label>Nickname Bạn Nữ / Bạn 2:</label>
+            <input type="text" id="name2Input" class="cute-input" value="Bé Mèo" required maxlength="20">
+          </div>
+          <button type="submit" class="cute-btn btn-primary w-100">
+            Lưu Biệt Danh Yêu Thương 💕
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Footer History & Love Message -->
+    <footer class="app-footer">
+      <div class="history-pill" id="historyPill">
+        <span>📜 Bữa ăn gần nhất: </span>
+        <strong id="lastMealText">Chưa có, hãy quay ngay! 😋</strong>
+      </div>
+      <p class="love-footer-text">
+        Được làm với tất cả tình yêu dành cho người ấy 💖 Không còn nỗi lo "Ăn gì cũng được"
+      </p>
+    </footer>
+  </div>
+
+  <!-- Audio Context & App Scripts -->
+  <script src="app.js"></script>
+</body>
+</html>
