@@ -1483,6 +1483,7 @@ const coupleNameModal = document.getElementById('coupleNameModal');
 function initApp() {
   loadCoupleNames();
   setupEventListeners();
+  initAuthAndChat();
   loadDishesData().then(() => {
     setupInitialRoulette(categoryTrack, categoriesList, true);
     renderDishesManagementList();
@@ -1698,6 +1699,7 @@ function showCategoryWonModal(category) {
 }
 
 function showFinalDishModal(dish) {
+  lastWinningDish = dish;
   document.getElementById('resultEmoji').textContent = dish.emoji || '🍲';
   document.getElementById('resultCategoryTag').textContent = dish.category;
   document.getElementById('resultDishName').textContent = dish.name;
@@ -2023,3 +2025,524 @@ function updateCSVPreview() {
 
 // Start app on DOM ready
 document.addEventListener('DOMContentLoaded', initApp);
+
+// ==========================================
+// COUPLE AUTH & REAL-TIME CHAT MODULE
+// ==========================================
+
+let lastWinningDish = null;
+let backendUrl = localStorage.getItem('happi_backend_url') || 'http://localhost:5001';
+let authToken = localStorage.getItem('happi_access_token') || null;
+let currentUser = JSON.parse(localStorage.getItem('happi_user') || 'null');
+let currentPartner = null;
+let currentConversationId = null;
+let sseSource = null;
+let unreadCount = 0;
+
+function initAuthAndChat() {
+  const authHeaderBtn = document.getElementById('authHeaderBtn');
+  const authModal = document.getElementById('authModal');
+  const closeAuthModalBtn = document.getElementById('closeAuthModalBtn');
+  const openChatBtn = document.getElementById('openChatBtn');
+  const chatDrawer = document.getElementById('chatDrawer');
+  const closeChatBtn = document.getElementById('closeChatBtn');
+  const minimizeChatBtn = document.getElementById('minimizeChatBtn');
+  const shareMealToChatBtn = document.getElementById('shareMealToChatBtn');
+
+  const tabLoginBtn = document.getElementById('tabLoginBtn');
+  const tabRegisterBtn = document.getElementById('tabRegisterBtn');
+  const loginForm = document.getElementById('loginForm');
+  const registerForm = document.getElementById('registerForm');
+
+  const saveBackendUrlBtn = document.getElementById('saveBackendUrlBtn');
+  const saveGuestBackendUrlBtn = document.getElementById('saveGuestBackendUrlBtn');
+  const backendUrlInput = document.getElementById('backendUrlInput');
+  const guestBackendUrlInput = document.getElementById('guestBackendUrlInput');
+
+  if (backendUrlInput) backendUrlInput.value = backendUrl;
+  if (guestBackendUrlInput) guestBackendUrlInput.value = backendUrl;
+
+  const saveUrl = (val) => {
+    let clean = val.trim().replace(/\/+$/, '');
+    if (!clean) clean = 'http://localhost:5001';
+    backendUrl = clean;
+    localStorage.setItem('happi_backend_url', backendUrl);
+    if (backendUrlInput) backendUrlInput.value = backendUrl;
+    if (guestBackendUrlInput) guestBackendUrlInput.value = backendUrl;
+    alert(`Đã lưu địa chỉ máy chủ: ${backendUrl} 💕`);
+    if (authToken) checkPartner();
+  };
+
+  if (saveBackendUrlBtn) saveBackendUrlBtn.addEventListener('click', () => saveUrl(backendUrlInput.value));
+  if (saveGuestBackendUrlBtn) saveGuestBackendUrlBtn.addEventListener('click', () => saveUrl(guestBackendUrlInput.value));
+
+  if (authHeaderBtn) authHeaderBtn.addEventListener('click', () => {
+    updateAuthModalUI();
+    showModal(authModal);
+  });
+  if (closeAuthModalBtn) closeAuthModalBtn.addEventListener('click', () => hideModal(authModal));
+
+  if (tabLoginBtn && tabRegisterBtn) {
+    tabLoginBtn.addEventListener('click', () => {
+      tabLoginBtn.classList.add('active');
+      tabRegisterBtn.classList.remove('active');
+      loginForm.classList.remove('hidden');
+      registerForm.classList.add('hidden');
+    });
+    tabRegisterBtn.addEventListener('click', () => {
+      tabRegisterBtn.classList.add('active');
+      tabLoginBtn.classList.remove('active');
+      registerForm.classList.remove('hidden');
+      loginForm.classList.add('hidden');
+    });
+  }
+
+  if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errEl = document.getElementById('loginErrorMsg');
+      errEl.classList.add('hidden');
+      const submitBtn = document.getElementById('loginSubmitBtn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Đang đăng nhập... ⏳';
+
+      const username = document.getElementById('loginUsername').value.trim();
+      const password = document.getElementById('loginPassword').value;
+
+      try {
+        const res = await fetch(`${backendUrl}/api/auth/signin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Đăng nhập không thành công');
+
+        authToken = data.accessToken;
+        currentUser = data.user;
+        localStorage.setItem('happi_access_token', authToken);
+        localStorage.setItem('happi_user', JSON.stringify(currentUser));
+
+        updateHeaderAuthUI();
+        updateAuthModalUI();
+        hideModal(authModal);
+        await checkPartner();
+        openChat();
+      } catch (err) {
+        errEl.textContent = '⚠️ ' + err.message;
+        errEl.classList.remove('hidden');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Đăng Nhập Yêu Thương 💖';
+      }
+    });
+  }
+
+  if (registerForm) {
+    registerForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errEl = document.getElementById('registerErrorMsg');
+      errEl.classList.add('hidden');
+      const submitBtn = document.getElementById('registerSubmitBtn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Đang tạo tài khoản... ⏳';
+
+      const username = document.getElementById('regUsername').value.trim();
+      const displayName = document.getElementById('regDisplayName').value.trim();
+      const password = document.getElementById('regPassword').value;
+
+      try {
+        const res = await fetch(`${backendUrl}/api/auth/signup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, displayName, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Đăng ký thất bại');
+
+        alert('Tạo tài khoản cặp đôi thành công! Giờ hãy đăng nhập nhé 💕');
+        tabLoginBtn.click();
+        document.getElementById('loginUsername').value = username;
+        document.getElementById('loginPassword').value = password;
+      } catch (err) {
+        errEl.textContent = '⚠️ ' + err.message;
+        errEl.classList.remove('hidden');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Tạo Tài Khoản Cặp Đôi ✨';
+      }
+    });
+  }
+
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      authToken = null;
+      currentUser = null;
+      currentPartner = null;
+      currentConversationId = null;
+      if (sseSource) {
+        sseSource.close();
+        sseSource = null;
+      }
+      localStorage.removeItem('happi_access_token');
+      localStorage.removeItem('happi_user');
+      updateHeaderAuthUI();
+      updateAuthModalUI();
+      closeChat();
+    });
+  }
+
+  const connectPartnerBtn = document.getElementById('connectPartnerBtn');
+  if (connectPartnerBtn) {
+    connectPartnerBtn.addEventListener('click', async () => {
+      const input = document.getElementById('partnerUsernameInput');
+      const errEl = document.getElementById('pairErrorMsg');
+      errEl.classList.add('hidden');
+      const partnerUsername = input.value.trim();
+      if (!partnerUsername) {
+        errEl.textContent = 'Vui lòng nhập username người yêu nha!';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      connectPartnerBtn.disabled = true;
+      connectPartnerBtn.textContent = 'Đang ghép đôi... ⏳';
+
+      try {
+        const res = await fetch(`${backendUrl}/api/couple/connect`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({ partnerUsername })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Không thể kết nối');
+
+        currentPartner = data.partner;
+        currentConversationId = data.conversationId;
+        alert(data.message || 'Ghép đôi thành công! 💕');
+        updateAuthModalUI();
+        startSSE();
+        await loadMessages();
+        hideModal(authModal);
+        openChat();
+      } catch (err) {
+        errEl.textContent = '⚠️ ' + err.message;
+        errEl.classList.remove('hidden');
+      } finally {
+        connectPartnerBtn.disabled = false;
+        connectPartnerBtn.textContent = 'Ghép Đôi 💘';
+      }
+    });
+  }
+
+  if (openChatBtn) openChatBtn.addEventListener('click', () => {
+    if (!authToken) {
+      showModal(authModal);
+      return;
+    }
+    openChat();
+  });
+  if (closeChatBtn) closeChatBtn.addEventListener('click', closeChat);
+  if (minimizeChatBtn) minimizeChatBtn.addEventListener('click', closeChat);
+
+  const openChatFromProfileBtn = document.getElementById('openChatFromProfileBtn');
+  if (openChatFromProfileBtn) openChatFromProfileBtn.addEventListener('click', () => {
+    hideModal(authModal);
+    openChat();
+  });
+
+  const chatForm = document.getElementById('chatForm');
+  const chatInput = document.getElementById('chatInput');
+  if (chatForm && chatInput) {
+    chatForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = chatInput.value.trim();
+      if (!text || !currentConversationId) return;
+      chatInput.value = '';
+
+      try {
+        const res = await fetch(`${backendUrl}/api/messages/direct`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            conversationId: currentConversationId,
+            recipientId: currentPartner?._id,
+            content: text
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.message) {
+          appendMessageUI(data.message, true);
+        }
+      } catch (err) {
+        console.error('Lỗi gửi tin nhắn:', err);
+      }
+    });
+  }
+
+  document.querySelectorAll('.emoji-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const emoji = btn.getAttribute('data-emoji');
+      if (chatInput) {
+        chatInput.value += emoji;
+        chatInput.focus();
+      }
+    });
+  });
+
+  if (shareMealToChatBtn) {
+    shareMealToChatBtn.addEventListener('click', async () => {
+      if (!lastWinningDish) return;
+      if (!authToken) {
+        alert('Hãy đăng nhập để gửi món ăn này vào cuộc trò chuyện của hai bạn nhé! 💕');
+        showModal(authModal);
+        return;
+      }
+      if (!currentPartner || !currentConversationId) {
+        alert('Bạn chưa kết nối với tài khoản người yêu. Hãy nhập username của người ấy để ghép đôi trước nhé! 🐰');
+        showModal(authModal);
+        return;
+      }
+
+      shareMealToChatBtn.disabled = true;
+      shareMealToChatBtn.textContent = 'Đang gửi... 💌';
+
+      try {
+        const res = await fetch(`${backendUrl}/api/couple/share-dish`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            dishName: lastWinningDish.name,
+            categoryName: lastWinningDish.category,
+            conversationId: currentConversationId,
+            note: 'Tối nay hai đứa mình đi ăn món này nha bé iu! 🥰'
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.message) {
+          appendMessageUI(data.message, true);
+          hideModal(resultModal);
+          openChat();
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        shareMealToChatBtn.disabled = false;
+        shareMealToChatBtn.textContent = '💌 Rủ Người Yêu Ăn Món Này';
+      }
+    });
+  }
+
+  updateHeaderAuthUI();
+  if (authToken) {
+    checkPartner();
+  }
+}
+
+function updateHeaderAuthUI() {
+  const authPillText = document.getElementById('authPillText');
+  const authPillIcon = document.getElementById('authPillIcon');
+  const authHeaderBtn = document.getElementById('authHeaderBtn');
+
+  if (currentUser && authToken) {
+    if (authPillText) authPillText.textContent = currentUser.displayName || currentUser.username;
+    if (authPillIcon) authPillIcon.textContent = '🐻';
+    if (authHeaderBtn) authHeaderBtn.classList.add('logged-in');
+  } else {
+    if (authPillText) authPillText.textContent = 'Đăng Nhập';
+    if (authPillIcon) authPillIcon.textContent = '💖';
+    if (authHeaderBtn) authHeaderBtn.classList.remove('logged-in');
+  }
+}
+
+function updateAuthModalUI() {
+  const loggedInView = document.getElementById('authLoggedInView');
+  const guestView = document.getElementById('authGuestView');
+
+  if (currentUser && authToken) {
+    loggedInView.classList.remove('hidden');
+    guestView.classList.add('hidden');
+    document.getElementById('myDisplayName').textContent = currentUser.displayName || currentUser.username;
+    document.getElementById('myUsername').textContent = '@' + currentUser.username;
+
+    const hasPartnerSection = document.getElementById('hasPartnerSection');
+    const noPartnerSection = document.getElementById('noPartnerSection');
+
+    if (currentPartner) {
+      hasPartnerSection.classList.remove('hidden');
+      noPartnerSection.classList.add('hidden');
+      document.getElementById('myMatchName').textContent = currentUser.displayName;
+      document.getElementById('partnerMatchName').textContent = currentPartner.displayName || currentPartner.username;
+    } else {
+      hasPartnerSection.classList.add('hidden');
+      noPartnerSection.classList.remove('hidden');
+    }
+  } else {
+    loggedInView.classList.add('hidden');
+    guestView.classList.remove('hidden');
+  }
+}
+
+async function checkPartner() {
+  if (!authToken) return;
+  try {
+    const res = await fetch(`${backendUrl}/api/couple/partner`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    if (res.status === 401 || res.status === 403) {
+      authToken = null;
+      currentUser = null;
+      localStorage.removeItem('happi_access_token');
+      localStorage.removeItem('happi_user');
+      updateHeaderAuthUI();
+      return;
+    }
+    const data = await res.json();
+    if (data.hasPartner) {
+      currentPartner = data.partner;
+      currentConversationId = data.conversationId;
+      document.getElementById('chatPartnerName').textContent = currentPartner.displayName || currentPartner.username;
+      startSSE();
+      loadMessages();
+    }
+  } catch (err) {
+    console.warn('Lỗi kiểm tra người yêu:', err.message);
+  }
+}
+
+function startSSE() {
+  if (sseSource) sseSource.close();
+  if (!authToken) return;
+
+  const url = `${backendUrl}/api/couple/stream?token=${authToken}`;
+  try {
+    sseSource = new EventSource(url);
+    sseSource.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.type === 'message' && payload.message) {
+          const msg = payload.message;
+          const isMine = msg.senderId === (currentUser?._id || currentUser?.id);
+          appendMessageUI(msg, isMine);
+
+          const chatDrawer = document.getElementById('chatDrawer');
+          if (chatDrawer && chatDrawer.classList.contains('hidden') && !isMine) {
+            unreadCount++;
+            const badge = document.getElementById('chatUnreadBadge');
+            if (badge) {
+              badge.textContent = unreadCount;
+              badge.classList.remove('hidden');
+            }
+            playTickSound();
+          }
+        }
+      } catch (e) {}
+    };
+    sseSource.onerror = () => {};
+  } catch (err) {
+    console.error('Lỗi kết nối SSE:', err);
+  }
+}
+
+async function loadMessages() {
+  if (!currentConversationId || !authToken) return;
+  const container = document.getElementById('chatMessagesContainer');
+  try {
+    const res = await fetch(`${backendUrl}/api/conversations/${currentConversationId}/messages`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    const data = await res.json();
+    if (res.ok && Array.isArray(data.messages)) {
+      container.innerHTML = '';
+      if (data.messages.length === 0) {
+        container.innerHTML = `
+          <div class="chat-placeholder">
+            <span class="placeholder-emoji">💌</span>
+            <p>Chưa có tin nhắn nào. Hãy gửi lời chào đầu tiên đến người ấy nhé! 🥰</p>
+          </div>
+        `;
+      } else {
+        data.messages.forEach(msg => {
+          const isMine = msg.senderId === (currentUser?._id || currentUser?.id);
+          appendMessageUI(msg, isMine, false);
+        });
+        container.scrollTop = container.scrollHeight;
+      }
+    }
+  } catch (err) {
+    console.warn('Không tải được lịch sử tin nhắn:', err.message);
+  }
+}
+
+function appendMessageUI(msg, isMine, scroll = true) {
+  const container = document.getElementById('chatMessagesContainer');
+  if (!container) return;
+
+  const placeholder = container.querySelector('.chat-placeholder');
+  if (placeholder) placeholder.remove();
+
+  if (msg._id && container.querySelector(`[data-id="${msg._id}"]`)) return;
+
+  const row = document.createElement('div');
+  row.className = `msg-row ${isMine ? 'mine' : 'partner'}`;
+  if (msg._id) row.setAttribute('data-id', msg._id);
+
+  const timeStr = msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+
+  if (msg.content && msg.content.includes('🍽️ [Gợi ý món ăn]:')) {
+    const lines = msg.content.split('\n');
+    const headerLine = lines[0].replace('🍽️ [Gợi ý món ăn]:', '').trim();
+    const noteLine = lines.slice(1).join(' ').replace('💌 Lời nhắn:', '').trim();
+
+    row.innerHTML = `
+      <div class="msg-bubble msg-food-card">
+        <div class="food-card-header">🍽️ Gợi ý món ăn từ ${isMine ? 'bạn' : (currentPartner?.displayName || 'người yêu')}</div>
+        <div class="food-card-title">${headerLine}</div>
+        ${noteLine ? `<div class="food-card-note">💌 "${noteLine}"</div>` : ''}
+      </div>
+      <span class="msg-time">${timeStr}</span>
+    `;
+  } else {
+    row.innerHTML = `
+      <div class="msg-bubble">${escapeHtml(msg.content || '')}</div>
+      <span class="msg-time">${timeStr}</span>
+    `;
+  }
+
+  container.appendChild(row);
+  if (scroll) {
+    container.scrollTop = container.scrollHeight;
+  }
+}
+
+function escapeHtml(text) {
+  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+  return text.replace(/[&<>"']/g, (m) => map[m]);
+}
+
+function openChat() {
+  const chatDrawer = document.getElementById('chatDrawer');
+  if (chatDrawer) {
+    chatDrawer.classList.remove('hidden');
+    unreadCount = 0;
+    const badge = document.getElementById('chatUnreadBadge');
+    if (badge) badge.classList.add('hidden');
+    const container = document.getElementById('chatMessagesContainer');
+    if (container) container.scrollTop = container.scrollHeight;
+  }
+}
+
+function closeChat() {
+  const chatDrawer = document.getElementById('chatDrawer');
+  if (chatDrawer) chatDrawer.classList.add('hidden');
+}

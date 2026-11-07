@@ -40,6 +40,10 @@
       </div>
 
       <div class="header-controls">
+        <button id="authHeaderBtn" class="cute-auth-pill" title="Tài khoản cặp đôi & Đăng nhập">
+          <span id="authPillIcon">💖</span>
+          <span id="authPillText">Đăng Nhập</span>
+        </button>
         <button id="soundToggleBtn" class="cute-icon-btn" title="Bật/Tắt âm thanh">
           <span id="soundIcon">🔊</span>
         </button>
@@ -179,6 +183,9 @@
         </div>
 
         <div class="result-action-grid">
+          <button id="shareMealToChatBtn" class="cute-btn btn-love">
+            💌 Rủ Người Yêu Ăn Món Này
+          </button>
           <a id="findMapBtn" class="cute-btn btn-success" target="_blank" rel="noopener">
             📍 Tìm Quán Quanh Đây
           </a>
@@ -369,6 +376,173 @@
         Được làm với tất cả tình yêu dành cho người ấy 💖 Không còn nỗi lo "Ăn gì cũng được"
       </p>
     </footer>
+  </div>
+
+  <!-- ================= FLOATING CHAT BUTTON ================= -->
+  <button id="openChatBtn" class="floating-chat-bubble" title="Nhắn tin cho người yêu">
+    <span class="bubble-heart">💌</span>
+    <span class="bubble-label">Chat Cặp Đôi</span>
+    <span class="unread-badge hidden" id="chatUnreadBadge">0</span>
+  </button>
+
+  <!-- ================= AUTH & COUPLE PAIR MODAL ================= -->
+  <div id="authModal" class="modal-overlay hidden">
+    <div class="modal-card auth-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="modal-icon">💑</span>
+          <div>
+            <h3 id="authModalTitle">Tài Khoản Tình Yêu</h3>
+            <p id="authModalDesc">Đăng nhập để đồng bộ món ăn & nhắn tin trực tiếp</p>
+          </div>
+        </div>
+        <button id="closeAuthModalBtn" class="close-btn" aria-label="Đóng">&times;</button>
+      </div>
+
+      <!-- Logged In Profile View -->
+      <div id="authLoggedInView" class="hidden">
+        <div class="user-profile-banner">
+          <div class="profile-avatar" id="myAvatar">🐻</div>
+          <div class="profile-info">
+            <h4 id="myDisplayName">Bảo Bảo</h4>
+            <p id="myUsername">@bao</p>
+          </div>
+          <button id="logoutBtn" class="cute-btn btn-outline btn-small" type="button">Đăng Xuất</button>
+        </div>
+
+        <!-- Couple Matching Status -->
+        <div class="couple-connect-box">
+          <div id="hasPartnerSection" class="hidden">
+            <div class="couple-heart-match">
+              <span class="match-name" id="myMatchName">Anh Gấu</span>
+              <span class="heart-pulse">💖</span>
+              <span class="match-name" id="partnerMatchName">Bé Mèo</span>
+            </div>
+            <p class="match-status">Hai bạn đã kết đôi thành công trên MongoDB! Giờ có thể nhắn tin cho nhau mọi lúc.</p>
+            <button id="openChatFromProfileBtn" class="cute-btn btn-primary w-100" type="button">
+              💌 Mở Cửa Sổ Chat Ngay
+            </button>
+          </div>
+
+          <div id="noPartnerSection">
+            <h4 class="connect-heading">Kết Nối Với Người Yêu 💕</h4>
+            <p class="connect-sub">Nhập tên đăng nhập (username) của người yêu để ghép đôi:</p>
+            <div class="input-with-action">
+              <input type="text" id="partnerUsernameInput" class="cute-input" placeholder="Ví dụ: beyeu, meocute...">
+              <button type="button" id="connectPartnerBtn" class="cute-btn btn-primary">Ghép Đôi 💘</button>
+            </div>
+            <div id="pairErrorMsg" class="auth-error-msg hidden"></div>
+          </div>
+        </div>
+
+        <!-- Backend Configuration Details -->
+        <details class="server-config-details">
+          <summary>⚙️ Cấu Hình Máy Chủ Backend (Tùy Chọn)</summary>
+          <div class="server-config-form">
+            <label>Địa chỉ API Server Backend:</label>
+            <input type="text" id="backendUrlInput" class="cute-input" value="http://localhost:5001">
+            <button type="button" id="saveBackendUrlBtn" class="cute-btn btn-outline btn-small">Lưu Cấu Hình</button>
+            <p class="server-hint">Khi chạy offline/máy nhà: <code>http://localhost:5001</code>. Khi deploy online (Render/Railway), nhập link server vào đây.</p>
+          </div>
+        </details>
+      </div>
+
+      <!-- Guest (Login / Register) View -->
+      <div id="authGuestView">
+        <div class="modal-tabs">
+          <button class="tab-btn active" id="tabLoginBtn" type="button">Đăng Nhập</button>
+          <button class="tab-btn" id="tabRegisterBtn" type="button">Đăng Ký Mới</button>
+        </div>
+
+        <!-- Login Form -->
+        <form id="loginForm" class="cute-form">
+          <div class="form-group">
+            <label>Tên Đăng Nhập (Username)</label>
+            <input type="text" id="loginUsername" class="cute-input" placeholder="Tên đăng nhập..." required autocomplete="username">
+          </div>
+          <div class="form-group">
+            <label>Mật Khẩu</label>
+            <input type="password" id="loginPassword" class="cute-input" placeholder="Mật khẩu của bạn..." required autocomplete="current-password">
+          </div>
+          <div id="loginErrorMsg" class="auth-error-msg hidden"></div>
+          <button type="submit" class="cute-btn btn-primary w-100" id="loginSubmitBtn">Đăng Nhập Yêu Thương 💖</button>
+        </form>
+
+        <!-- Register Form -->
+        <form id="registerForm" class="cute-form hidden">
+          <div class="form-group">
+            <label>Tên Đăng Nhập (Username) <span class="req">*</span></label>
+            <input type="text" id="regUsername" class="cute-input" placeholder="Ví dụ: bao_deptrai, be_meo..." required autocomplete="username">
+          </div>
+          <div class="form-group">
+            <label>Biệt Danh Hiển Thị <span class="req">*</span></label>
+            <input type="text" id="regDisplayName" class="cute-input" placeholder="Ví dụ: Anh Gấu 🐻, Bé Heo 🐷..." required>
+          </div>
+          <div class="form-group">
+            <label>Mật Khẩu <span class="req">*</span></label>
+            <input type="password" id="regPassword" class="cute-input" placeholder="Mật khẩu bảo vệ..." required autocomplete="new-password">
+          </div>
+          <div id="registerErrorMsg" class="auth-error-msg hidden"></div>
+          <button type="submit" class="cute-btn btn-success w-100" id="registerSubmitBtn">Tạo Tài Khoản Cặp Đôi ✨</button>
+        </form>
+
+        <!-- Backend Configuration Details for Guests -->
+        <details class="server-config-details">
+          <summary>⚙️ Cấu Hình Máy Chủ Backend (Tùy Chọn)</summary>
+          <div class="server-config-form">
+            <label>Địa chỉ API Server Backend:</label>
+            <input type="text" id="guestBackendUrlInput" class="cute-input" value="http://localhost:5001">
+            <button type="button" id="saveGuestBackendUrlBtn" class="cute-btn btn-outline btn-small">Lưu Cấu Hình</button>
+            <p class="server-hint">Mặc định: <code>http://localhost:5001</code></p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= REAL-TIME COUPLE CHAT DRAWER ================= -->
+  <div id="chatDrawer" class="chat-drawer hidden">
+    <div class="chat-header">
+      <div class="chat-user-info">
+        <span class="chat-avatar" id="chatPartnerAvatar">🐰</span>
+        <div>
+          <h4 class="chat-name" id="chatPartnerName">Bé Yêu</h4>
+          <span class="chat-status"><span class="status-dot"></span> Đang trực tuyến</span>
+        </div>
+      </div>
+      <div class="chat-header-actions">
+        <button id="minimizeChatBtn" class="chat-tool-btn" title="Thu nhỏ">➖</button>
+        <button id="closeChatBtn" class="chat-tool-btn" title="Đóng">&times;</button>
+      </div>
+    </div>
+
+    <!-- Messages Area -->
+    <div class="chat-messages" id="chatMessagesContainer">
+      <div class="chat-placeholder">
+        <span class="placeholder-emoji">💌</span>
+        <p>Hai bạn hãy nhắn tin cho nhau hoặc bấm quay món để rủ nhau đi ăn nha! 🥰</p>
+      </div>
+    </div>
+
+    <!-- Quick Emoji Food Bar -->
+    <div class="chat-quick-emojis">
+      <button type="button" class="emoji-chip" data-emoji="🍗">🍗</button>
+      <button type="button" class="emoji-chip" data-emoji="🍲">🍲</button>
+      <button type="button" class="emoji-chip" data-emoji="🧋">🧋</button>
+      <button type="button" class="emoji-chip" data-emoji="🍣">🍣</button>
+      <button type="button" class="emoji-chip" data-emoji="🍕">🍕</button>
+      <button type="button" class="emoji-chip" data-emoji="💖">💖</button>
+      <button type="button" class="emoji-chip" data-emoji="🤤">🤤</button>
+      <button type="button" class="emoji-chip" data-emoji="🥺">🥺</button>
+    </div>
+
+    <!-- Message Input Form -->
+    <form id="chatForm" class="chat-input-area">
+      <input type="text" id="chatInput" class="chat-text-input" placeholder="Nhắn gì đó cho người iu nè..." autocomplete="off">
+      <button type="submit" class="chat-send-btn" id="chatSendBtn" title="Gửi">
+        <span>🚀</span>
+      </button>
+    </form>
   </div>
 
   <!-- Audio Context & App Scripts -->
