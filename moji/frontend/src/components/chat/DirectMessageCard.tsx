@@ -3,32 +3,29 @@ import ChatCard from "./ChatCard";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useChatStore } from "@/stores/useChatStore";
 import { cn } from "@/lib/utils";
-import { User } from "lucide-react";
 import UserAvatar from "./UserAvatar";
-
 import UnreadCountBadge from "./UnreadCountBadge";
 import StatusBadge from "./StatusBadge";
 
 const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
   const { user } = useAuthStore();
-  const { activeConversationId, setActiveConversation, messages } =
-    useChatStore();
+  const { activeConversationId, setActiveConversation } = useChatStore();
+
   if (!user) return null;
   const otherUser = convo.participants.find((p) => p._id !== user._id);
   if (!otherUser) return null;
-  const unreadCount = convo.unreadCounts[user._id];
-  const lastMessage = convo.lastMessage?.content ?? "";
 
-  const handleSelectConversation = async (id: string) => {
+  const unreadCount = convo.unreadCounts?.[user._id] ?? 0;
+  const lastMessage = convo.lastMessage?.content ?? "Chưa có tin nhắn";
+
+  const handleSelectConversation = (id: string) => {
     setActiveConversation(id);
-    if (!messages[id]) {
-    }
-    //todo fetch messages for this conversation
   };
+
   return (
     <ChatCard
       convoId={convo._id}
-      name={otherUser.displayName ?? ""}
+      name={otherUser.displayName || "Bạn bè"}
       timestamp={
         convo.lastMessage?.createdAt
           ? new Date(convo.lastMessage.createdAt)
@@ -41,10 +38,10 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
         <>
           <UserAvatar
             type="sidebar"
-            name={otherUser.displayName ?? "Unknown"}
+            name={otherUser.displayName || "Bạn bè"}
             avatarUrl={otherUser.avatarUrl ?? undefined}
           />
-          <StatusBadge status="offline" />
+          <StatusBadge status="online" />
           {unreadCount > 0 && <UnreadCountBadge unreadCount={unreadCount} />}
         </>
       }
@@ -54,7 +51,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
             "text-sm truncate",
             unreadCount > 0
               ? "font-medium text-foreground"
-              : "text-muted-foreground",
+              : "text-muted-foreground"
           )}
         >
           {lastMessage}

@@ -2,20 +2,21 @@ import type { Conversation } from "@/types/chat";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useChatStore } from "@/stores/useChatStore";
 import ChatCard from "./ChatCard";
+import UnreadCountBadge from "./UnreadCountBadge";
+import { Users } from "lucide-react";
 
 const GroupChatCard = ({ convo }: { convo: Conversation }) => {
   const { user } = useAuthStore();
-  const { activeConversationId, setActiveConversation, messages } =
-    useChatStore();
+  const { activeConversationId, setActiveConversation } = useChatStore();
+
   if (!user) return null;
-  const unreadCount = convo.unreadCounts[user._id];
-  const name = convo.group?.name ?? "";
-  const handleSeclectConversation = async (id: string) => {
+  const unreadCount = convo.unreadCounts?.[user._id] ?? 0;
+  const name = convo.group?.name || "Nhóm Chat";
+
+  const handleSelectConversation = (id: string) => {
     setActiveConversation(id);
-    if (!messages[id]) {
-      //todo fetch messages for this conversation
-    }
   };
+
   return (
     <ChatCard
       convoId={convo._id}
@@ -26,12 +27,19 @@ const GroupChatCard = ({ convo }: { convo: Conversation }) => {
           : undefined
       }
       isActive={activeConversationId === convo._id}
-      onSelect={handleSeclectConversation}
+      onSelect={handleSelectConversation}
       unreadCount={unreadCount}
-      leftSection={<></>}
+      leftSection={
+        <div className="relative">
+          <div className="size-12 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-base shadow-sm">
+            <Users className="size-5" />
+          </div>
+          {unreadCount > 0 && <UnreadCountBadge unreadCount={unreadCount} />}
+        </div>
+      }
       subtitle={
         <p className="text-sm truncate text-muted-foreground">
-          {convo.participants.length} thành viên
+          {convo.lastMessage?.content || `${convo.participants.length} thành viên`}
         </p>
       }
     />

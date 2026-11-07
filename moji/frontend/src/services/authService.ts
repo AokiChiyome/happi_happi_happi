@@ -4,33 +4,35 @@ export const authService = {
   signUp: async (
     username: string,
     password: string,
-    email: string,
-    firstName: string,
-    lastName: string,
+    email?: string,
+    firstName?: string,
+    lastName?: string,
+    displayName?: string
   ) => {
     const res = await api.post(
       "/auth/signup",
       {
         username,
         password,
-        email,
-        firstName,
-        lastName,
+        email: email || `${username}@happi.chat`,
+        firstName: firstName || "",
+        lastName: lastName || "",
+        displayName: displayName || username,
       },
       {
         withCredentials: true,
-      },
+      }
     );
     return res.data;
   },
 
   signIn: async (username: string, password: string) => {
     const res = await api.post(
-      "auth/signin",
+      "/auth/signin",
       { username, password },
-      { withCredentials: true },
+      { withCredentials: true }
     );
-    return res.data; // access token
+    return res.data; // { accessToken, user, message }
   },
 
   signOut: async () => {
@@ -39,10 +41,11 @@ export const authService = {
 
   fetchMe: async () => {
     const res = await api.get("/users/me", { withCredentials: true });
-    return res.data.user; // user data
+    return res.data.user;
   },
+
   refresh: async () => {
     const res = await api.post("/auth/refresh", { withCredentials: true });
-    return res.data.accessToken; // access token
+    return res.data.accessToken;
   },
 };
