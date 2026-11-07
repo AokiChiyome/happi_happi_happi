@@ -1298,7 +1298,7 @@ function refreshCategories() {
 
 function getCardMetrics() {
   const isMobile = window.innerWidth <= 600;
-  const cardWidth = isMobile ? 145 : 180;
+  const cardWidth = isMobile ? 140 : 180;
   const cardGap = isMobile ? 10 : 14;
   return { cardWidth, cardGap, totalWidth: cardWidth + cardGap };
 }

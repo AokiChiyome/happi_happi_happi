@@ -36,9 +36,9 @@
 
 @media (max-width: 600px) {
   :root {
-    --card-w: 145px;
+    --card-w: 140px;
     --card-gap: 10px;
-    --card-h: 195px;
+    --card-h: 200px;
   }
 }
 
@@ -52,6 +52,9 @@
 
 body {
   font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   background-color: var(--bg-page);
   background-image: 
     radial-gradient(#FFD6E0 1.2px, transparent 1.2px), 
@@ -141,8 +144,8 @@ body {
 }
 
 .couple-names {
-  font-family: 'Fredoka', cursive, sans-serif;
-  font-weight: 600;
+  font-family: 'Comfortaa', 'Quicksand', 'Nunito', sans-serif;
+  font-weight: 700;
   color: var(--primary);
   font-size: 0.95rem;
 }
@@ -241,17 +244,17 @@ body {
 }
 
 .title-main {
-  font-family: 'Fredoka', cursive, sans-serif;
-  font-size: 2.3rem;
+  font-family: 'Comfortaa', 'Quicksand', 'Nunito', sans-serif;
+  font-size: 2.2rem;
   font-weight: 700;
   color: #FF3366;
   text-shadow: 2px 2px 0 #FFF0F4, 4px 4px 0 #FFE0E7;
-  line-height: 1.2;
+  line-height: 1.25;
 }
 
 @media (max-width: 600px) {
   .title-main {
-    font-size: 1.8rem;
+    font-size: 1.65rem;
   }
 }
 
@@ -272,6 +275,19 @@ body {
   border-radius: 999px;
   border: 2px solid var(--border-cute);
   box-shadow: 0 4px 12px rgba(255, 94, 142, 0.08);
+}
+
+@media (max-width: 600px) {
+  .stage-stepper {
+    padding: 4px 8px;
+    gap: 6px;
+    max-width: 100%;
+  }
+  .step-pill {
+    padding: 4px 10px;
+    font-size: 0.8rem;
+    gap: 6px;
+  }
 }
 
 .step-pill {
@@ -383,11 +399,11 @@ body {
 }
 
 .case-title {
-  font-family: 'Fredoka', cursive, sans-serif;
-  font-size: 1.35rem;
+  font-family: 'Comfortaa', 'Quicksand', 'Nunito', sans-serif;
+  font-size: 1.3rem;
   font-weight: 700;
   color: var(--text-main);
-  line-height: 1.2;
+  line-height: 1.25;
 }
 
 .case-subtitle {
@@ -492,6 +508,16 @@ body {
   background: linear-gradient(0deg, #FF3366, #FFA0B4);
 }
 
+@media (max-width: 600px) {
+  .needle-line {
+    height: 36px;
+    width: 3px;
+  }
+  .needle-heart {
+    font-size: 1rem;
+  }
+}
+
 /* Roulette Moving Track */
 .roulette-track {
   display: flex;
@@ -564,9 +590,9 @@ body {
 }
 
 .card-title {
-  font-family: 'Fredoka', cursive, sans-serif;
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-family: 'Quicksand', 'Nunito', sans-serif;
+  font-size: 0.92rem;
+  font-weight: 700;
   color: var(--text-main);
   line-height: 1.25;
   display: -webkit-box;
@@ -623,8 +649,8 @@ body {
 
 /* Cute Buttons */
 .cute-btn {
-  font-family: 'Fredoka', cursive, sans-serif;
-  font-weight: 600;
+  font-family: 'Comfortaa', 'Quicksand', 'Nunito', sans-serif;
+  font-weight: 700;
   font-size: 1.05rem;
   padding: 12px 28px;
   border-radius: 999px;
@@ -642,6 +668,14 @@ body {
 .cute-btn.btn-large {
   font-size: 1.25rem;
   padding: 16px 42px;
+}
+
+@media (max-width: 600px) {
+  .cute-btn.btn-large {
+    font-size: 1.1rem;
+    padding: 14px 24px;
+    width: 100%;
+  }
 }
 
 .cute-btn.btn-small {
@@ -754,9 +788,27 @@ body {
   max-width: 580px;
   max-height: 90vh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 28px;
   position: relative;
   animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@media (max-width: 600px) {
+  .modal-card {
+    padding: 20px 14px;
+    border-radius: 22px;
+    max-height: 92vh;
+  }
+  .result-dish-name {
+    font-size: 1.45rem;
+  }
+  .result-emoji-bubble {
+    font-size: 3.5rem;
+  }
+  .result-card {
+    padding: 22px 14px;
+  }
 }
 
 .modal-card.small-card {
@@ -792,8 +844,9 @@ body {
 }
 
 .modal-title-wrap h3 {
-  font-family: 'Fredoka', cursive, sans-serif;
-  font-size: 1.3rem;
+  font-family: 'Comfortaa', 'Quicksand', 'Nunito', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
   color: var(--text-main);
 }
 
@@ -833,8 +886,8 @@ body {
   display: inline-block;
   background: #FFEAA7;
   color: #B25E00;
-  font-family: 'Fredoka', cursive, sans-serif;
-  font-size: 1.1rem;
+  font-family: 'Comfortaa', 'Quicksand', 'Nunito', sans-serif;
+  font-size: 1.05rem;
   font-weight: 700;
   padding: 6px 20px;
   border-radius: 999px;
@@ -876,8 +929,8 @@ body {
 }
 
 .result-dish-name {
-  font-family: 'Fredoka', cursive, sans-serif;
-  font-size: 1.85rem;
+  font-family: 'Comfortaa', 'Quicksand', 'Nunito', sans-serif;
+  font-size: 1.8rem;
   font-weight: 700;
   color: #FF3366;
   margin-bottom: 8px;
@@ -937,8 +990,8 @@ body {
 }
 
 .cat-win-name {
-  font-family: 'Fredoka', cursive, sans-serif;
-  font-size: 1.7rem;
+  font-family: 'Comfortaa', 'Quicksand', 'Nunito', sans-serif;
+  font-size: 1.65rem;
   color: var(--primary);
   font-weight: 700;
   margin-bottom: 6px;
@@ -993,6 +1046,13 @@ body {
   margin-bottom: 14px;
 }
 
+@media (max-width: 600px) {
+  .filter-bar {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
 .cute-select, .cute-input {
   font-family: 'Nunito', sans-serif;
   font-size: 0.92rem;
@@ -1006,6 +1066,13 @@ body {
   transition: border-color 0.2s ease;
 }
 
+@media (max-width: 600px) {
+  .cute-select, .cute-input {
+    font-size: 16px; /* Prevents auto-zoom on iOS Safari */
+    width: 100%;
+  }
+}
+
 .cute-select:focus, .cute-input:focus {
   border-color: var(--primary);
 }
@@ -1013,6 +1080,7 @@ body {
 .dishes-list-container {
   max-height: 380px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   gap: 8px;
