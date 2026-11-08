@@ -99,6 +99,20 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+// Middleware tự động kết nối MongoDB cho cả Serverless (Vercel) và Localhost
+app.use(async (req, res, next) => {
+  if (req.path.startsWith("/assets/") || req.path.endsWith(".html") || req.path.endsWith(".ico")) {
+    return next();
+  }
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    console.error("Lỗi kết nối CSDL MongoDB Atlas:", error.message);
+    return res.status(500).json({ message: "Không thể kết nối cơ sở dữ liệu MongoDB Atlas" });
+  }
+});
+
 app.use("/api/auth", authRoute);
 
 // Private routes (yêu cầu đăng nhập)
@@ -211,11 +225,15 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, async () => {
-  console.log(`🚀 Happi Backend Server đang chạy trên cổng ${PORT}`);
-  console.log(`👉 Bảng điều khiển: http://localhost:${PORT}`);
-  console.log(`👉 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`Đang kết nối cơ sở dữ liệu MongoDB Atlas...`);
-  await connectDB();
-  console.log(`✅ Đã kết nối MongoDB Atlas thành công!`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, async () => {
+    console.log(`🚀 Happi Backend Server đang chạy trên cổng ${PORT}`);
+    console.log(`👉 Bảng điều khiển: http://localhost:${PORT}`);
+    console.log(`👉 Health check: http://localhost:${PORT}/api/health`);
+    console.log(`Đang kết nối cơ sở dữ liệu MongoDB Atlas...`);
+    await connectDB();
+    console.log(`✅ Đã kết nối MongoDB Atlas thành công!`);
+  });
+}
+
+export default app;

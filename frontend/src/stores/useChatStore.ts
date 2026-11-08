@@ -7,6 +7,7 @@ import { useAuthStore } from "./useAuthStore";
 import { toast } from "sonner";
 
 let sseConnection: EventSource | null = null;
+let syncInterval: any = null;
 
 export const useChatStore = create<ChatState>()(
   persist(
@@ -33,6 +34,10 @@ export const useChatStore = create<ChatState>()(
         if (sseConnection) {
           sseConnection.close();
           sseConnection = null;
+        }
+        if (syncInterval) {
+          clearInterval(syncInterval);
+          syncInterval = null;
         }
         set({
           conversations: [],
@@ -305,6 +310,18 @@ export const useChatStore = create<ChatState>()(
         const streamUrl = `${baseUrl}/api/messages/stream?token=${accessToken}`;
 
         try {
+          if (syncInterval) {
+            clearInterval(syncInterval);
+          }
+          // Chế độ đồng bộ thông minh mỗi 4s: Bảo đảm tin nhắn và hội thoại luôn cập nhật trên cả Vercel Serverless
+          syncInterval = setInterval(() => {
+            const { activeConversationId } = get();
+            if (activeConversationId) {
+              get().fetchMessages(activeConversationId);
+            }
+            get().fetchConversations();
+          }, 4000);
+
           sseConnection = new EventSource(streamUrl);
 
           sseConnection.onmessage = (event) => {
