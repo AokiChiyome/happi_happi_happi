@@ -52,7 +52,7 @@ export const useAuthStore = create<AuthState>()(
           await useChatStore.getState().fetchConversations();
           await useChatStore.getState().fetchFriends();
           useChatStore.getState().initRealtimeStream();
-          toast.success("Chào mừng bạn đã quay lại với Moji! 💖");
+          toast.success("Chào mừng bạn đã quay lại với Happi! 💖");
         } catch (error: any) {
           console.error(error);
           toast.error(error.response?.data?.message || "Đăng nhập không thành công");

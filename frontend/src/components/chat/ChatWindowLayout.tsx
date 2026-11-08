@@ -76,7 +76,7 @@ export const ChatWindowLayout: React.FC = () => {
           💌
         </div>
         <h2 className="text-2xl font-extrabold text-foreground mb-2">
-          Chào mừng đến với Moji! ✨
+          Chào mừng đến với Happi! ✨
         </h2>
         <p className="text-sm text-muted-foreground max-w-md mb-8">
           Chọn một người bạn hoặc một nhóm từ danh sách bên trái để bắt đầu nhắn

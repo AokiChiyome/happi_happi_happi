@@ -1,0 +1,23 @@
+{
+  "name": "happi-fullstack",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Happi - Nền Tảng Chat Cặp Đôi & Ẩm Thực Thông Minh",
+  "type": "module",
+  "scripts": {
+    "dev": "node dev.js",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "start": "cd backend && npm start"
+  },
+  "keywords": [
+    "happi",
+    "chat",
+    "food-roulette",
+    "couple-app",
+    "fullstack"
+  ],
+  "author": "AokiChiyome",
+  "license": "ISC"
+}

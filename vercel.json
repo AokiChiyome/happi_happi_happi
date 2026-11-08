@@ -1,6 +1,6 @@
 {
-  "buildCommand": "cd moji/frontend && npm install && npm run build",
-  "outputDirectory": "moji/frontend/dist",
+  "buildCommand": "cd frontend && npm run build",
+  "outputDirectory": "frontend/dist",
   "framework": "vite",
   "rewrites": [
     {

@@ -53,7 +53,7 @@ export function SignupForm({
                 <a href="/" className="mx-auto block w-fit text-center">
                   <img src="/logo.svg" alt="logo" />
                 </a>
-                <h1 className="text-2xl font-bold"> Tạo tài khoản Moji</h1>
+                <h1 className="text-2xl font-bold"> Tạo tài khoản Happi</h1>
                 <p className="text-muted-foreground text balance">
                   Chào mừng bạn! Hãy đăng kí để bắt đầu
                 </p>

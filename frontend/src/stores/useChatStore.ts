@@ -297,7 +297,9 @@ export const useChatStore = create<ChatState>()(
         }
 
         const baseUrl =
-          import.meta.env.MODE === "development"
+          import.meta.env.VITE_API_URL
+            ? (import.meta.env.VITE_API_URL as string).replace(/\/api\/?$/, "")
+            : import.meta.env.MODE === "development"
             ? "http://localhost:5001"
             : "";
         const streamUrl = `${baseUrl}/api/messages/stream?token=${accessToken}`;

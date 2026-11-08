@@ -3,12 +3,14 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL:
-    import.meta.env.MODE === "development"
+    import.meta.env.VITE_API_URL ||
+    (import.meta.env.MODE === "development"
       ? "http://localhost:5001/api"
-      : "/api",
+      : "/api"),
   withCredentials: true,
 });
-// gắn token vào header của request
+
+// Gắn token vào header của request
 api.interceptors.request.use((config) => {
   const { accessToken } = useAuthStore.getState();
 
@@ -18,24 +20,24 @@ api.interceptors.request.use((config) => {
 
   return config;
 });
-// tự đong refresh token khi token hết hạn
+
+// Tự động refresh token khi token hết hạn
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const originalRequest = error.config;
     if (
-      originalRequest.url.includes("/auth/signin") ||
-      originalRequest.url.includes("/auth/signup") ||
-      originalRequest.url.includes("/auth/refresh")
+      originalRequest.url?.includes("/auth/signin") ||
+      originalRequest.url?.includes("/auth/signup") ||
+      originalRequest.url?.includes("/auth/refresh")
     ) {
       return Promise.reject(error);
     }
     originalRequest._retryCount = originalRequest._retryCount || 0;
     if (error.response?.status === 403 && originalRequest._retryCount < 4) {
       originalRequest._retryCount += 1;
-      console.log("Trying to refresh token...");
       try {
-        const res = await api.post("/auth/refresh", { withCredentials: true });
+        const res = await api.post("/auth/refresh", {}, { withCredentials: true });
         const newAccessToken = res.data.accessToken;
         useAuthStore.getState().setAccessToken(newAccessToken);
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
