@@ -207,7 +207,25 @@ export const streamMessages = (req, res) => {
     }
   };
 
+  const onFriendRequest = (data) => {
+    try {
+      if (data.toUserId === userId) {
+        res.write(`data: ${JSON.stringify({ type: "friend_request", ...data })}\n\n`);
+      }
+    } catch (e) {}
+  };
+
+  const onFriendAccepted = (data) => {
+    try {
+      if (data.userA === userId || data.userB === userId) {
+        res.write(`data: ${JSON.stringify({ type: "friend_accepted", ...data })}\n\n`);
+      }
+    } catch (e) {}
+  };
+
   chatEmitter.on("new_message", onMessage);
+  chatEmitter.on("new_friend_request", onFriendRequest);
+  chatEmitter.on("friend_request_accepted", onFriendAccepted);
 
   // Heartbeat định kỳ 20s để không bị ngắt kết nối
   const interval = setInterval(() => {
@@ -219,5 +237,7 @@ export const streamMessages = (req, res) => {
   req.on("close", () => {
     clearInterval(interval);
     chatEmitter.off("new_message", onMessage);
+    chatEmitter.off("new_friend_request", onFriendRequest);
+    chatEmitter.off("friend_request_accepted", onFriendAccepted);
   });
 };

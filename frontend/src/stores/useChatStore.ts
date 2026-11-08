@@ -310,11 +310,29 @@ export const useChatStore = create<ChatState>()(
           sseConnection.onmessage = (event) => {
             try {
               const payload = JSON.parse(event.data);
+              if (payload.type === "friend_request") {
+                get().fetchFriendRequests();
+                toast.info("💌 Bạn vừa nhận được một lời mời kết bạn mới!");
+                return;
+              }
+
+              if (payload.type === "friend_accepted") {
+                get().fetchFriends();
+                get().fetchConversations();
+                toast.success("🎉 Hai bạn đã trở thành bạn bè! Có thể nhắn tin ngay 💕");
+                return;
+              }
+
               if (payload.type === "message" && payload.message) {
                 const msg: Message = payload.message;
                 const convoId = msg.conversationId;
                 const { activeConversationId, conversations } = get();
                 const currentUserId = useAuthStore.getState().user?._id;
+
+                // Nếu cuộc trò chuyện chưa có trong danh sách thì tự động load lại danh sách
+                if (!conversations.some((c) => c._id === convoId)) {
+                  get().fetchConversations();
+                }
 
                 set((state) => {
                   const prevItems = state.messages[convoId]?.items || [];
