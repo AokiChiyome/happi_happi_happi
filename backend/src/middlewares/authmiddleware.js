@@ -1,44 +1,46 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
-export const protectedRoute = (req, res, next) => {
+export const protectedRoute = async (req, res, next) => {
   try {
-    // lấy token từ header (Authorization: Bearer <token>) hoặc query param (?token=...)
+    // Lấy token từ Authorization Header, Query params (?token=...) cho SSE, hoặc Cookie
     const authHeader = req.headers["authorization"];
     const token =
-      (authHeader && authHeader.split(" ")[1]) ||
+      (authHeader && typeof authHeader === "string" && authHeader.startsWith("Bearer ")
+        ? authHeader.split(" ")[1]
+        : null) ||
       req.query?.token ||
       req.cookies?.accessToken;
 
-    if (!token) {
-      return res.status(401).json({ message: "không tìm thấy token" });
+    if (!token || typeof token !== "string") {
+      return res.status(401).json({ message: "Vui lòng đăng nhập để tiếp tục" });
     }
 
-    // xác nhận token hợp lệ
-    jwt.verify(
-      token,
-      process.env.ACCESS_TOKEN_SECRET,
-      async (err, decodedUser) => {
-        if (err) {
-          console.error("JWT verify error:", err.message);
-          return res
-            .status(403)
-            .json({ message: "access token hết hạn hoặc không đúng" });
-        }
-        // tìm user
-        const user = await User.findById(decodedUser.userId).select(
-          "-hashedPassword"
-        );
-        if (!user) {
-          return res.status(404).json({ message: "người dùng không tồn tại" });
-        }
-        // trả user về trong req
-        req.user = user;
-        next();
-      }
-    );
+    if (!process.env.ACCESS_TOKEN_SECRET) {
+      console.error("LỖI BẢO MẬT: ACCESS_TOKEN_SECRET chưa được cấu hình!");
+      return res.status(500).json({ message: "Lỗi cấu hình bảo mật máy chủ" });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    } catch (err) {
+      return res.status(403).json({ message: "Phiên đăng nhập không hợp lệ hoặc đã hết hạn" });
+    }
+
+    if (!decoded?.userId) {
+      return res.status(403).json({ message: "Token không chứa thông tin định danh" });
+    }
+
+    const user = await User.findById(decoded.userId).select("-hashedPassword");
+    if (!user) {
+      return res.status(404).json({ message: "Người dùng không tồn tại" });
+    }
+
+    req.user = user;
+    next();
   } catch (error) {
-    console.error("lỗi khi xác minh JWT trong authmiddleware", error);
-    return res.status(500).json({ message: "lỗi hệ thống" });
+    console.error("Lỗi xác thực người dùng trong protectedRoute:", error);
+    return res.status(500).json({ message: "Lỗi hệ thống xác thực" });
   }
 };

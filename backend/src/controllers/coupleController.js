@@ -125,10 +125,13 @@ export const connectPartner = async (req, res) => {
     updateconversationAfterCreateMessage(conversation, welcomeMsg, userId);
     await conversation.save();
 
+    const participantIds = conversation.participants.map((p) => p.userId.toString());
+
     chatEmitter.emit("new_message", {
       conversationId: conversation._id.toString(),
       message: welcomeMsg,
       sender: { _id: req.user._id, displayName: req.user.displayName },
+      participantIds,
     });
 
     return res.status(200).json({
@@ -152,8 +155,12 @@ export const shareDish = async (req, res) => {
     const { dishName, categoryName, conversationId, note } = req.body;
     const senderId = req.user._id;
 
-    if (!dishName || !conversationId) {
+    if (!dishName || typeof dishName !== "string" || !conversationId) {
       return res.status(400).json({ message: "Thiếu tên món hoặc mã cuộc trò chuyện" });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(conversationId)) {
+      return res.status(400).json({ message: "Mã cuộc trò chuyện không hợp lệ" });
     }
 
     const conversation = await Conversation.findById(conversationId);
@@ -161,8 +168,22 @@ export const shareDish = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy cuộc trò chuyện" });
     }
 
-    const content = `🍽️ [Gợi ý món ăn]: **${dishName}** (${categoryName || "Món ngon"})${
-      note ? `\n💌 Lời nhắn: ${note}` : ""
+    // KIỂM SOÁT QUYỀN TRUY CẬP: Phải là thành viên mới được chia sẻ món ăn vào chat
+    const isParticipant = conversation.participants.some(
+      (p) => p.userId.toString() === senderId.toString()
+    );
+    if (!isParticipant) {
+      return res.status(403).json({
+        message: "Bạn không phải thành viên của cuộc trò chuyện này",
+      });
+    }
+
+    const cleanDish = dishName.trim().slice(0, 100);
+    const cleanCategory = (categoryName || "Món ngon").trim().slice(0, 50);
+    const cleanNote = note && typeof note === "string" ? note.trim().slice(0, 300) : "";
+
+    const content = `🍽️ [Gợi ý món ăn]: **${cleanDish}** (${cleanCategory})${
+      cleanNote ? `\n💌 Lời nhắn: ${cleanNote}` : ""
     }`;
 
     const message = await Message.create({
@@ -174,10 +195,13 @@ export const shareDish = async (req, res) => {
     updateconversationAfterCreateMessage(conversation, message, senderId);
     await conversation.save();
 
+    const participantIds = conversation.participants.map((p) => p.userId.toString());
+
     chatEmitter.emit("new_message", {
       conversationId: conversation._id.toString(),
       message,
       sender: { _id: senderId, displayName: req.user.displayName },
+      participantIds,
     });
 
     return res.status(201).json({ message });
@@ -201,7 +225,10 @@ export const streamMessages = (req, res) => {
 
   const onMessage = (data) => {
     try {
-      res.write(`data: ${JSON.stringify({ type: "message", ...data })}\n\n`);
+      // BẢO VỆ DỮ LIỆU: Chỉ gửi tin nhắn nếu user hiện tại thực sự là người nhận hoặc người gửi trong hội thoại!
+      if (!data.participantIds || data.participantIds.includes(userId)) {
+        res.write(`data: ${JSON.stringify({ type: "message", ...data })}\n\n`);
+      }
     } catch (e) {
       console.error("Lỗi gửi qua SSE stream:", e);
     }

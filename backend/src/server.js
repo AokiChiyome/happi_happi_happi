@@ -20,15 +20,62 @@ dotenv.config({ path: path.join(__dirname, "../.env") });
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// Middlewares
-app.use(express.json());
+// 1. TẮT HEADER X-POWERED-BY ĐỂ ẨN DẤU VẾT CÔNG NGHỆ SERVER
+app.disable("x-powered-by");
+
+// 2. OWASP SECURITY HEADERS MIDDLEWARE
+app.use((req, res, next) => {
+  // Chống MIME-sniffing
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  // Chống Clickjacking
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  // Bộ lọc XSS trình duyệt
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  // Bảo vệ thông tin Referer khi chuyển hướng
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  next();
+});
+
+// 3. GIỚI HẠN DUNG LƯỢNG BODY CHỐNG TẤN CÔNG MEMORY EXHAUSTION DOS
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(cookieParser());
 
-// Cấu hình CORS mở linh hoạt cho Localhost (5173, 5500, 3000) và Vercel / GitHub Pages
+// 4. DANH SÁCH ORIGIN ĐƯỢC PHÉP TRUY CẬP (CHỐNG CROSS-SITE CSRF / DATA LEAK)
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5500",
+  "http://localhost:3000",
+  "http://localhost:5001",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5500",
+];
+
+if (process.env.CLIENT_URL) {
+  process.env.CLIENT_URL.split(",").forEach((url) => {
+    const trimmed = url.trim();
+    if (trimmed && !allowedOrigins.includes(trimmed)) {
+      allowedOrigins.push(trimmed);
+    }
+  });
+}
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      callback(null, true);
+      // Cho phép request không có origin (như curl, mobile apps, SSR)
+      if (!origin) return callback(null, true);
+
+      // Cho phép localhost, domain đã cấu hình, hoặc preview từ Vercel
+      const isAllowed =
+        allowedOrigins.includes(origin) ||
+        /^https:\/\/[a-zA-Z0-9-]+\.vercel\.app$/.test(origin);
+
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        callback(new Error("CORS policy does not allow access from this origin."));
+      }
     },
     credentials: true,
   })
@@ -153,12 +200,14 @@ if (fs.existsSync(distPath)) {
   });
 }
 
-// Global error handler
+// Global error handler (Không làm lộ stack trace ra ngoài cho kẻ tấn công)
 app.use((err, req, res, next) => {
-  console.error("Unhandled Server Error:", err);
-  res.status(500).json({
+  console.error("Server Error Handled:", err.message);
+  if (err.message && err.message.includes("CORS")) {
+    return res.status(403).json({ message: "Bị chặn bởi chính sách CORS" });
+  }
+  return res.status(500).json({
     message: "Lỗi hệ thống nội bộ máy chủ",
-    error: process.env.NODE_ENV === "development" ? err.message : undefined,
   });
 });
 
