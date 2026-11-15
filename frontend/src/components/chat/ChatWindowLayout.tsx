@@ -28,6 +28,7 @@ import {
   Bell,
   BellRing,
   MessageCircle,
+  Copy,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -95,6 +96,56 @@ export const ChatWindowLayout: React.FC = () => {
   // Tìm kiếm tin nhắn nhanh trong hội thoại (Telegram style)
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Thao tác Tin Nhắn Trên Điện Thoại khi Ấn Giữ (Mobile Long-Press & Context Menu)
+  const [activeActionMessage, setActiveActionMessage] = useState<Message | null>(null);
+  const longPressTimerRef = useRef<any>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent, msg: Message) => {
+    if (msg.isRecalled || msg._id.startsWith("temp-")) return;
+    const touch = e.touches[0];
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
+
+    // 400ms ấn giữ ngón tay để kích hoạt menu thao tác di động
+    longPressTimerRef.current = setTimeout(() => {
+      triggerHaptic("heavy");
+      setActiveActionMessage(msg);
+      longPressTimerRef.current = null;
+    }, 400);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartPosRef.current || !longPressTimerRef.current) return;
+    const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
+    const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
+
+    // Nếu người dùng cuộn màn hình chat (>10px), hủy ngay sự kiện ấn giữ
+    if (dx > 10 || dy > 10) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    touchStartPosRef.current = null;
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, msg: Message) => {
+    if (msg.isRecalled || msg._id.startsWith("temp-")) return;
+    e.preventDefault();
+    triggerHaptic("medium");
+    setActiveActionMessage(msg);
+  };
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<any>(null);
@@ -598,8 +649,17 @@ export const ChatWindowLayout: React.FC = () => {
                     isMine ? "flex-row-reverse" : "flex-row"
                   }`}
                 >
-                  {/* BONG BÓNG TIN NHẮN */}
-                  <div className={`flex flex-col min-w-0 ${isMine ? "items-end" : "items-start"}`}>
+                  {/* BONG BÓNG TIN NHẮN (Ấn giữ trên điện thoại hoặc click chuột phải trên máy tính để mở menu) */}
+                  <div
+                    className={`flex flex-col min-w-0 no-callout ${
+                      isMine ? "items-end" : "items-start"
+                    }`}
+                    onTouchStart={(e) => handleTouchStart(e, msg)}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    onTouchCancel={handleTouchEnd}
+                    onContextMenu={(e) => handleContextMenu(e, msg)}
+                  >
                     {/* 1. TIN NHẮN ĐÃ ĐƯỢC THU HỒI */}
                     {isRecalled ? (
                       <div className="max-w-full">
@@ -1125,6 +1185,167 @@ export const ChatWindowLayout: React.FC = () => {
           </>
         )}
       </footer>
+
+      {/* ================= MODAL THAO TÁC TIN NHẮN KHI ẤN GIỮ TRÊN MOBILE (TELEGRAM / MESSENGER STYLE) ================= */}
+      {activeActionMessage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-end sm:justify-center p-4 pb-[max(1rem,env(safe-area-inset-bottom))] animate-in fade-in duration-150 select-none"
+          onClick={() => setActiveActionMessage(null)}
+        >
+          <div
+            className="w-full max-w-sm flex flex-col items-center gap-3 animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 1. THANH THẢ CẢM XÚC NHANH (QUICK REACTIONS) */}
+            <div className="flex items-center justify-around w-full bg-card/95 backdrop-blur-xl border border-border/80 rounded-full px-4 py-2.5 shadow-2xl">
+              {QUICK_EMOJIS.map((emoji) => {
+                const hasReacted = activeActionMessage.reactions?.some(
+                  (r) => r.userId === user?._id && r.emoji === emoji
+                );
+                return (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic("light");
+                      toggleMessageReaction(activeActionMessage._id, emoji);
+                      setActiveActionMessage(null);
+                    }}
+                    className={`text-2xl sm:text-3xl p-1 rounded-full transition-transform hover:scale-130 active:scale-90 ${
+                      hasReacted
+                        ? "bg-pink-500/20 scale-110 ring-2 ring-pink-500/50"
+                        : "hover:bg-muted"
+                    }`}
+                  >
+                    {emoji}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 2. BẢN XEM TRƯỚC TIN NHẮN ĐANG CHỌN (MINI PREVIEW) */}
+            <div className="w-full px-4 py-2.5 bg-card/90 backdrop-blur-md rounded-2xl border border-border/60 text-xs text-muted-foreground shadow-sm flex items-center justify-between">
+              <span className="font-bold text-foreground truncate mr-2 shrink-0">
+                {activeActionMessage.senderId === user?._id
+                  ? "Tin nhắn của bạn"
+                  : otherUser?.displayName || "Người yêu"}
+              </span>
+              <span className="truncate max-w-[200px] italic">
+                "{activeActionMessage.content || "[Hình ảnh/Nhãn dán]"}"
+              </span>
+            </div>
+
+            {/* 3. MENU HÀNH ĐỘNG DẠNG THẺ (CARD ACTIONS) */}
+            <div className="w-full bg-card/95 backdrop-blur-xl border border-border/80 rounded-3xl p-1.5 shadow-2xl divide-y divide-border/40 text-xs font-semibold">
+              {/* Trả lời */}
+              <button
+                type="button"
+                onClick={() => {
+                  setReplyingToMessage(activeActionMessage);
+                  setActiveActionMessage(null);
+                  triggerHaptic("selection");
+                }}
+                className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-muted active:bg-muted/80 text-foreground transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <CornerUpLeft className="size-4 text-pink-500" />
+                  <span>Trả lời tin nhắn này</span>
+                </div>
+              </button>
+
+              {/* Sao chép văn bản (nếu có nội dung) */}
+              {activeActionMessage.content && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(activeActionMessage.content || "");
+                    toast.success("Đã sao chép nội dung tin nhắn! 📋");
+                    triggerHaptic("selection");
+                    setActiveActionMessage(null);
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-muted active:bg-muted/80 text-foreground transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <Copy className="size-4 text-sky-500" />
+                    <span>Sao chép nội dung</span>
+                  </div>
+                </button>
+              )}
+
+              {/* Ghim tin nhắn */}
+              <button
+                type="button"
+                onClick={() => {
+                  pinMessage(activeConvo._id, activeActionMessage._id);
+                  toast.success("Đã ghim tin nhắn lên đầu đoạn chat! 📌");
+                  triggerHaptic("selection");
+                  setActiveActionMessage(null);
+                }}
+                className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-muted active:bg-muted/80 text-foreground transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <Pin className="size-4 text-amber-500" />
+                  <span>Ghim lên đầu đoạn chat</span>
+                </div>
+              </button>
+
+              {/* Lưu vào Sổ tay ẩm thực */}
+              <button
+                type="button"
+                onClick={() => {
+                  addBookmark({
+                    type: "message",
+                    targetId: activeActionMessage._id,
+                    title: `Tin nhắn từ ${
+                      activeActionMessage.sender?.displayName || "Bạn"
+                    }`,
+                    content: activeActionMessage.content || "",
+                    emoji: "⭐",
+                  });
+                  toast.success("Đã lưu vào Sổ tay ẩm thực & Yêu thích! ⭐");
+                  triggerHaptic("selection");
+                  setActiveActionMessage(null);
+                }}
+                className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-muted active:bg-muted/80 text-foreground transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <Bookmark className="size-4 text-amber-500" />
+                  <span>Lưu vào Sổ tay yêu thích</span>
+                </div>
+              </button>
+
+              {/* Thu hồi tin nhắn (Nếu là của người dùng và chưa thu hồi) */}
+              {activeActionMessage.senderId === user?._id &&
+                !activeActionMessage.isRecalled && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      recallMessage(activeActionMessage._id);
+                      toast.success("Đã thu hồi tin nhắn thành công! 🚫");
+                      triggerHaptic("warning");
+                      setActiveActionMessage(null);
+                    }}
+                    className="w-full flex items-center justify-between p-3 rounded-2xl hover:bg-rose-500/10 active:bg-rose-500/20 text-rose-500 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 font-bold">
+                      <Undo2 className="size-4 text-rose-500" />
+                      <span>Thu hồi tin nhắn</span>
+                    </div>
+                  </button>
+                )}
+            </div>
+
+            {/* Nút Đóng / Hủy */}
+            <Button
+              variant="outline"
+              onClick={() => setActiveActionMessage(null)}
+              className="w-full h-11 rounded-2xl font-bold text-xs bg-card/90"
+            >
+              Đóng
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
