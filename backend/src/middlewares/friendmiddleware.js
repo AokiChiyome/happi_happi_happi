@@ -5,8 +5,38 @@ const pair = (a, b) => (a < b ? [a, b] : [b, a]);
 export const CheckFriendship = async (req, res, next) => {
   try {
     const me = req.user._id.toString();
-    const recipientId = req.body?.recipientId ?? null;
+    let recipientId = req.body?.recipientId ?? null;
+    const conversationId = req.body?.conversationId ?? null;
     const memberIds = req.body?.memberIds ?? [];
+
+    // Nếu đã có conversationId, kiểm tra quyền thành viên trong hội thoại
+    if (conversationId) {
+      const conversation = await Conversation.findById(conversationId);
+      if (!conversation) {
+        return res.status(404).json({ message: "Cuộc trò chuyện không tồn tại" });
+      }
+      const isMember = conversation.participants.some(
+        (p) => p.userId.toString() === me
+      );
+      if (!isMember) {
+        return res.status(403).json({
+          message: "Bạn không phải thành viên của cuộc trò chuyện này",
+        });
+      }
+
+      // Tự động tìm recipientId nếu chưa có
+      if (!recipientId && conversation.type === "direct") {
+        const other = conversation.participants.find(
+          (p) => p.userId.toString() !== me
+        );
+        if (other) {
+          req.body.recipientId = other.userId.toString();
+          recipientId = other.userId.toString();
+        }
+      }
+      return next();
+    }
+
     if (!recipientId && memberIds.length === 0) {
       return res
         .status(400)

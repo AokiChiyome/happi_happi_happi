@@ -67,6 +67,15 @@ export const useChatStore = create<ChatState>()(
           set({ loading: true });
           const { conversations } = await chatService.fetchConversations();
           set({ conversations, loading: false });
+
+          // Tự động mở cuộc trò chuyện cặp đôi nếu chưa có hội thoại nào được chọn
+          const currentActive = get().activeConversationId;
+          if (
+            (!currentActive || !conversations.some((c) => c._id === currentActive)) &&
+            conversations.length > 0
+          ) {
+            get().setActiveConversation(conversations[0]._id);
+          }
         } catch (error) {
           console.error("Lỗi khi tải danh sách cuộc trò chuyện", error);
           set({ loading: false });
@@ -159,6 +168,17 @@ export const useChatStore = create<ChatState>()(
         }
 
         try {
+          const currentUserId = currentUser?._id;
+          let finalRecipientId = recipientId;
+          if (!finalRecipientId && activeConvo?.type === "direct") {
+            const other = activeConvo.participants.find(
+              (p) => p._id !== currentUserId
+            );
+            if (other) {
+              finalRecipientId = other._id;
+            }
+          }
+
           let res: { message: Message };
           if (activeConvo?.type === "group" && activeConversationId) {
             res = await chatService.sendGroupMessage(
@@ -168,7 +188,7 @@ export const useChatStore = create<ChatState>()(
             );
           } else {
             res = await chatService.sendDirectMessage(
-              recipientId,
+              finalRecipientId,
               content,
               activeConversationId ?? undefined,
               imgURL
