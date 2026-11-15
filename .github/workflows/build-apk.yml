@@ -1,0 +1,95 @@
+name: Build Android APK (Happi)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    name: Build Native Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Frontend Dependencies & Capacitor
+        run: |
+          cd frontend
+          npm install --include=dev
+          npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/local-notifications @capacitor/haptics --save
+
+      - name: Build Web Application
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Initialize & Sync Capacitor Android
+        run: |
+          cd frontend
+          npx cap add android || true
+          npx cap sync android
+
+      - name: Grant Android Permissions in AndroidManifest.xml
+        run: |
+          MANIFEST="frontend/android/app/src/main/AndroidManifest.xml"
+          if [ -f "$MANIFEST" ]; then
+            # Insert permissions for Notifications, Vibrate, Wake Lock, and Internet
+            sed -i '/<application/i \    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.VIBRATE" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />\n    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />' $MANIFEST
+          fi
+
+      - name: Build Debug APK with Gradle
+        run: |
+          cd frontend/android
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Copy & Rename APK
+        run: |
+          mkdir -p output
+          cp frontend/android/app/build/outputs/apk/debug/app-debug.apk output/Happi.apk
+          ls -lh output/Happi.apk
+
+      - name: Upload APK as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Happi-Android-APK
+          path: output/Happi.apk
+          retention-days: 30
+
+      - name: Create GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
+        with:
+          tag_name: "v1.0.0-apk"
+          name: "Happi Android APK v1.0.0 🚀"
+          body: |
+            ### 📱 Bản cài đặt Android APK chính thức cho ứng dụng Happi 💕
+            - Tối ưu hóa toàn diện cho điện thoại Android (bao gồm Redmi Note 10 và các dòng máy tương đương).
+            - Đầy đủ thông báo đẩy hệ thống, rung phản hồi Haptic và hỗ trợ âm thanh.
+            - Không còn phụ thuộc vào trình duyệt web.
+            
+            **Hướng dẫn cài đặt:**
+            1. Tải file `Happi.apk` bên dưới về điện thoại.
+            2. Mở file và chọn **Cài đặt** (Cho phép cài đặt ứng dụng từ nguồn này nếu điện thoại hỏi).
+            3. Đăng nhập và bắt đầu trò chuyện cùng người ấy! 💕
+          files: output/Happi.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
