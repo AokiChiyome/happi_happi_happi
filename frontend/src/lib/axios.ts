@@ -1,17 +1,41 @@
 import { useAuthStore } from "@/stores/useAuthStore";
 import axios from "axios";
 
-const api = axios.create({
-  baseURL:
+export const getApiBaseUrl = (): string => {
+  if (typeof window !== "undefined") {
+    const customUrl = localStorage.getItem("happi_custom_api_url");
+    if (customUrl) return customUrl.replace(/\/$/, "");
+
+    // Nếu đang chạy trong môi trường App Native APK (Capacitor)
+    const isNative =
+      (window as any).Capacitor !== undefined ||
+      window.location.protocol === "capacitor:" ||
+      window.location.hostname === "localhost" && !window.location.port;
+
+    if (isNative) {
+      return (
+        import.meta.env.VITE_API_URL ||
+        "http://192.168.101.133:5001/api"
+      );
+    }
+  }
+
+  return (
     import.meta.env.VITE_API_URL ||
     (import.meta.env.MODE === "development"
       ? "http://localhost:5001/api"
-      : "/api"),
+      : "/api")
+  );
+};
+
+const api = axios.create({
+  baseURL: getApiBaseUrl(),
   withCredentials: true,
 });
 
-// Gắn token vào header của request
+// Luôn cập nhật baseURL động theo cấu hình môi trường
 api.interceptors.request.use((config) => {
+  config.baseURL = getApiBaseUrl();
   const { accessToken } = useAuthStore.getState();
 
   if (accessToken) {

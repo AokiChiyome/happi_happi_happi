@@ -6,6 +6,7 @@ import { persist } from "zustand/middleware";
 import { useAuthStore } from "./useAuthStore";
 import { usePostStore } from "./usePostStore";
 import { useNotificationStore } from "./useNotificationStore";
+import { getApiBaseUrl } from "@/lib/axios";
 import { toast } from "sonner";
 
 let sseConnection: EventSource | null = null;
@@ -680,12 +681,7 @@ export const useChatStore = create<ChatState>()(
           sseConnection.close();
         }
 
-        const baseUrl =
-          import.meta.env.VITE_API_URL
-            ? (import.meta.env.VITE_API_URL as string).replace(/\/api\/?$/, "")
-            : import.meta.env.MODE === "development"
-            ? "http://localhost:5001"
-            : "";
+        const baseUrl = getApiBaseUrl().replace(/\/api\/?$/, "");
         const streamUrl = `${baseUrl}/api/messages/stream?token=${accessToken}`;
 
         try {
