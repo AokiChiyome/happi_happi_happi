@@ -13,7 +13,10 @@ import {
   Volume2,
   VolumeX,
   Sparkles,
+  Smile,
 } from "lucide-react";
+import StickerPicker from "./StickerPicker";
+import type { Sticker } from "@/data/stickersData";
 import type { Message } from "@/types/chat";
 
 export const FloatingChatHead: React.FC = () => {
@@ -39,10 +42,12 @@ export const FloatingChatHead: React.FC = () => {
     setActiveConversation,
     setCurrentTab,
     sendMessage,
+    sendSticker,
     fetchMessages,
   } = useChatStore();
 
   const [miniInput, setMiniInput] = useState("");
+  const [showMiniStickers, setShowMiniStickers] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Active target conversation for the mini chat
@@ -101,6 +106,13 @@ export const FloatingChatHead: React.FC = () => {
     const partnerId = partnerUser?._id;
     await sendMessage(text, partnerId);
     setMiniInput("");
+  };
+
+  const handleSelectMiniSticker = async (sticker: Sticker) => {
+    if (!targetConvoId) return;
+    const partnerId = partnerUser?._id;
+    await sendSticker(sticker.url, `[Nhãn dán: ${sticker.name}]`, partnerId);
+    setShowMiniStickers(false);
   };
 
   if (!isChatHeadVisible && !isBubbleVisible && !isMiniChatOpen) {
@@ -199,15 +211,26 @@ export const FloatingChatHead: React.FC = () => {
                         </AvatarFallback>
                       </Avatar>
                     )}
-                    <div
-                      className={`max-w-[78%] px-3 py-2 rounded-2xl break-words leading-relaxed shadow-xs ${
-                        isMe
-                          ? "bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-br-xs font-medium"
-                          : "bg-muted/80 text-foreground rounded-bl-xs border border-border/60"
-                      }`}
-                    >
-                      {msg.content}
-                    </div>
+                    {msg.imgURL || msg.imgUrl ? (
+                      <div className="p-0.5 rounded-2xl hover:scale-110 active:scale-95 transition-transform">
+                        <img
+                          src={msg.imgURL || msg.imgUrl || ""}
+                          alt={msg.content || "Sticker"}
+                          className="size-24 sm:size-28 object-contain drop-shadow-xs select-none"
+                          loading="lazy"
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        className={`max-w-[78%] px-3 py-2 rounded-2xl break-words leading-relaxed shadow-xs ${
+                          isMe
+                            ? "bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-br-xs font-medium"
+                            : "bg-muted/80 text-foreground rounded-bl-xs border border-border/60"
+                        }`}
+                      >
+                        {msg.content}
+                      </div>
+                    )}
                   </div>
                 );
               })
@@ -215,11 +238,36 @@ export const FloatingChatHead: React.FC = () => {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Floating Mini Sticker Picker */}
+          {showMiniStickers && (
+            <div className="absolute bottom-14 right-2 z-50">
+              <StickerPicker
+                onSelectSticker={handleSelectMiniSticker}
+                onClose={() => setShowMiniStickers(false)}
+              />
+            </div>
+          )}
+
           {/* Input Footer */}
           <form
             onSubmit={handleSendMiniMessage}
-            className="p-2.5 bg-background border-t border-border/60 flex items-center gap-1.5"
+            className="p-2.5 bg-background border-t border-border/60 flex items-center gap-1.5 relative"
           >
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowMiniStickers(!showMiniStickers)}
+              className={`size-8 rounded-full shrink-0 transition-colors ${
+                showMiniStickers
+                  ? "bg-pink-500/15 text-pink-600 dark:text-pink-400"
+                  : "text-muted-foreground hover:text-pink-500"
+              }`}
+              title="Nhãn dán Sticker"
+            >
+              <Smile className="size-4" />
+            </Button>
+
             <Input
               value={miniInput}
               onChange={(e) => setMiniInput(e.target.value)}

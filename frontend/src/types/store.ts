@@ -51,7 +51,16 @@ export interface ChatState {
   setFoodRouletteOpen: (open: boolean) => void;
   fetchConversations: () => Promise<void>;
   fetchMessages: (conversationId: string) => Promise<void>;
-  sendMessage: (content: string, recipientId?: string) => Promise<void>;
+  sendMessage: (
+    content: string,
+    recipientId?: string,
+    imgURL?: string
+  ) => Promise<void>;
+  sendSticker: (
+    stickerUrl: string,
+    altText?: string,
+    recipientId?: string
+  ) => Promise<void>;
   sendFoodCard: (dish: {
     name: string;
     category: string;

@@ -14,7 +14,10 @@ import {
   MoreVertical,
   Users,
   Search,
+  Smile,
 } from "lucide-react";
+import StickerPicker from "./StickerPicker";
+import type { Sticker } from "@/data/stickersData";
 
 export const ChatWindowLayout: React.FC = () => {
   const { user } = useAuthStore();
@@ -23,10 +26,12 @@ export const ChatWindowLayout: React.FC = () => {
     activeConversationId,
     messages,
     sendMessage,
+    sendSticker,
     setFoodRouletteOpen,
   } = useChatStore();
 
   const [inputContent, setInputContent] = useState("");
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const activeConvo = conversations.find(
@@ -65,6 +70,12 @@ export const ChatWindowLayout: React.FC = () => {
 
   const handleEmojiClick = (emoji: string) => {
     setInputContent((prev) => prev + emoji);
+  };
+
+  const handleSelectSticker = (sticker: Sticker) => {
+    if (!activeConversationId) return;
+    sendSticker(sticker.url, `[Nhãn dán: ${sticker.name}]`, otherUser?._id);
+    setShowStickerPicker(false);
   };
 
   // If no active conversation, show Welcome Empty State
@@ -181,6 +192,8 @@ export const ChatWindowLayout: React.FC = () => {
             const isMine = msg.senderId === user?._id;
             const isFoodCard =
               msg.content && msg.content.includes("🍽️ [Gợi ý món ăn]:");
+            const stickerSrc = msg.imgURL || msg.imgUrl;
+            const isSticker = Boolean(stickerSrc);
 
             const timeStr = msg.createdAt
               ? new Date(msg.createdAt).toLocaleTimeString([], {
@@ -196,7 +209,7 @@ export const ChatWindowLayout: React.FC = () => {
                   isMine ? "items-end" : "items-start"
                 } animate-in fade-in-50 duration-200`}
               >
-                {/* Special Food Card Rendering */}
+                {/* 1. Special Food Card Rendering */}
                 {isFoodCard ? (
                   <div className="max-w-md w-full bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/30 border-2 border-amber-300 dark:border-amber-700/60 rounded-3xl p-4 shadow-md text-foreground">
                     <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-1">
@@ -237,8 +250,40 @@ export const ChatWindowLayout: React.FC = () => {
                       </span>
                     </div>
                   </div>
+                ) : isSticker ? (
+                  /* 2. Messenger / Telegram Floating Sticker Rendering */
+                  <div className="max-w-[78%] flex flex-col my-1 group">
+                    <div className="p-1 rounded-3xl hover:bg-muted/40 transition-colors inline-block">
+                      <img
+                        src={stickerSrc || ""}
+                        alt={msg.content || "Sticker"}
+                        className="size-28 sm:size-36 object-contain hover:scale-115 active:scale-95 transition-transform duration-200 cursor-pointer drop-shadow-md select-none"
+                        loading="lazy"
+                      />
+                    </div>
+                    {msg.content &&
+                      msg.content !== "[Nhãn dán]" &&
+                      !msg.content.startsWith("[Nhãn dán:") && (
+                        <div
+                          className={`px-3 py-1.5 rounded-2xl text-xs mt-1 shadow-xs max-w-full break-words ${
+                            isMine
+                              ? "bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-br-xs"
+                              : "bg-card text-foreground border border-border/80 rounded-bl-xs"
+                          }`}
+                        >
+                          {msg.content}
+                        </div>
+                      )}
+                    <span
+                      className={`text-[10px] text-muted-foreground block px-1 mt-0.5 ${
+                        isMine ? "text-right" : "text-left"
+                      }`}
+                    >
+                      {timeStr}
+                    </span>
+                  </div>
                 ) : (
-                  /* Standard Chat Bubble */
+                  /* 3. Standard Chat Bubble */
                   <div className="max-w-[78%]">
                     <div
                       className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words shadow-sm ${
@@ -266,7 +311,17 @@ export const ChatWindowLayout: React.FC = () => {
       </div>
 
       {/* ================= CHAT INPUT TOOLBAR ================= */}
-      <footer className="p-4 border-t border-border/50 bg-background/50 backdrop-blur-sm space-y-2">
+      <footer className="p-4 border-t border-border/50 bg-background/50 backdrop-blur-sm space-y-2 relative">
+        {/* Floating Sticker Picker Popover */}
+        {showStickerPicker && (
+          <div className="absolute bottom-20 left-4 z-40">
+            <StickerPicker
+              onSelectSticker={handleSelectSticker}
+              onClose={() => setShowStickerPicker(false)}
+            />
+          </div>
+        )}
+
         {/* Quick Emoji Bar */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-base select-none no-scrollbar">
           {["🍗", "🍲", "🧋", "🍣", "🍕", "💖", "🤤", "🥺", "✨"].map(
@@ -294,6 +349,21 @@ export const ChatWindowLayout: React.FC = () => {
 
         {/* Input Field */}
         <form onSubmit={handleSend} className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowStickerPicker(!showStickerPicker)}
+            className={`size-10 rounded-2xl shrink-0 transition-colors ${
+              showStickerPicker
+                ? "bg-pink-500/15 text-pink-600 dark:text-pink-400"
+                : "text-muted-foreground hover:text-pink-500 hover:bg-pink-500/10"
+            }`}
+            title="Bộ sưu tập nhãn dán Sticker"
+          >
+            <Smile className="size-5" />
+          </Button>
+
           <Input
             value={inputContent}
             onChange={(e) => setInputContent(e.target.value)}
@@ -303,7 +373,7 @@ export const ChatWindowLayout: React.FC = () => {
           <Button
             type="submit"
             disabled={!inputContent.trim()}
-            className="size-10 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white flex items-center justify-center shadow-md transition-transform hover:scale-105"
+            className="size-10 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white flex items-center justify-center shadow-md transition-transform hover:scale-105 shrink-0"
           >
             <Send className="size-4" />
           </Button>

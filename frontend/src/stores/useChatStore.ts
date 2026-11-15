@@ -86,7 +86,7 @@ export const useChatStore = create<ChatState>()(
         }
       },
 
-      sendMessage: async (content: string, recipientId?: string) => {
+      sendMessage: async (content: string, recipientId?: string, imgURL?: string) => {
         const { activeConversationId, conversations } = get();
         if (!activeConversationId && !recipientId) return;
 
@@ -99,13 +99,15 @@ export const useChatStore = create<ChatState>()(
           if (activeConvo?.type === "group" && activeConversationId) {
             res = await chatService.sendGroupMessage(
               activeConversationId,
-              content
+              content,
+              imgURL
             );
           } else {
             res = await chatService.sendDirectMessage(
               recipientId,
               content,
-              activeConversationId ?? undefined
+              activeConversationId ?? undefined,
+              imgURL
             );
           }
 
@@ -154,6 +156,14 @@ export const useChatStore = create<ChatState>()(
           console.error("Lỗi gửi tin nhắn", error);
           toast.error("Không thể gửi tin nhắn");
         }
+      },
+
+      sendSticker: async (
+        stickerUrl: string,
+        altText?: string,
+        recipientId?: string
+      ) => {
+        await get().sendMessage(altText || "[Nhãn dán]", recipientId, stickerUrl);
       },
 
       sendFoodCard: async (dish: {

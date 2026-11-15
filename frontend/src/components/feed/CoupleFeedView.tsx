@@ -22,6 +22,8 @@ import {
   RefreshCw,
   UserCheck,
 } from "lucide-react";
+import StickerPicker from "../chat/StickerPicker";
+import type { Sticker } from "@/data/stickersData";
 import type { Post } from "@/types/post";
 
 const FEELINGS = [
@@ -96,6 +98,8 @@ export const CoupleFeedView: React.FC = () => {
   const [showFoodPicker, setShowFoodPicker] = useState(false);
   const [foodSearch, setFoodSearch] = useState("");
   const [selectedFood, setSelectedFood] = useState<FoodDish | null>(null);
+  const [showComposerStickers, setShowComposerStickers] = useState(false);
+  const [activeCommentStickerPostId, setActiveCommentStickerPostId] = useState<string | null>(null);
 
   // Active expanded comments
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
@@ -417,6 +421,19 @@ export const CoupleFeedView: React.FC = () => {
               </div>
             )}
 
+            {/* Sticker picker panel in post composer */}
+            {showComposerStickers && (
+              <div className="pt-1 animate-in fade-in duration-200">
+                <StickerPicker
+                  onSelectSticker={(sticker) => {
+                    setAttachedImages([...attachedImages, sticker.url]);
+                    setShowComposerStickers(false);
+                  }}
+                  onClose={() => setShowComposerStickers(false)}
+                />
+              </div>
+            )}
+
             {/* Composer Footer Actions */}
             <div className="flex items-center justify-between pt-3 border-t border-border/60">
               <div className="flex items-center gap-1">
@@ -429,6 +446,21 @@ export const CoupleFeedView: React.FC = () => {
                 >
                   <ImageIcon className="size-4 text-emerald-500" />
                   <span className="hidden sm:inline">Ảnh</span>
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowComposerStickers(!showComposerStickers)}
+                  className={`rounded-xl gap-1.5 text-xs transition-colors ${
+                    showComposerStickers
+                      ? "text-pink-600 bg-pink-500/10 font-bold"
+                      : "text-muted-foreground hover:text-pink-500 hover:bg-pink-500/10"
+                  }`}
+                >
+                  <Smile className="size-4 text-pink-500" />
+                  <span className="hidden sm:inline">Nhãn dán</span>
                 </Button>
 
                 <Button
@@ -449,7 +481,7 @@ export const CoupleFeedView: React.FC = () => {
                   onClick={() => setShowFeelingPicker(!showFeelingPicker)}
                   className="rounded-xl gap-1.5 text-xs text-muted-foreground hover:text-purple-500 hover:bg-purple-500/10"
                 >
-                  <Smile className="size-4 text-purple-500" />
+                  <Sparkles className="size-4 text-purple-500" />
                   <span className="hidden sm:inline">Cảm xúc</span>
                 </Button>
               </div>
@@ -716,30 +748,71 @@ export const CoupleFeedView: React.FC = () => {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        {comments.map((comment) => (
-                          <div key={comment._id} className="flex items-start gap-2.5">
-                            <Avatar className="size-8 border border-border mt-0.5">
-                              <AvatarImage src={comment.authorId?.avatarUrl} />
-                              <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
-                                {comment.authorId?.displayName?.slice(0, 2).toUpperCase() || "U"}
-                              </AvatarFallback>
-                            </Avatar>
+                        {comments.map((comment) => {
+                          const isSticker =
+                            comment.content.startsWith("[sticker:") &&
+                            comment.content.endsWith("]");
+                          let stickerUrl = "";
+                          let stickerName = "";
+                          if (isSticker) {
+                            const inner = comment.content.slice(9, -1);
+                            const parts = inner.split(":");
+                            stickerUrl = parts[0];
+                            stickerName = parts[1] || "Nhãn dán";
+                          }
 
-                            <div className="flex-1 bg-background/80 border border-border/80 rounded-2xl p-3 shadow-xs">
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="font-bold text-xs text-foreground">
-                                  {comment.authorId?.displayName || comment.authorId?.username}
-                                </span>
-                                <span className="text-[10px] text-muted-foreground">
-                                  {formatRelativeTime(comment.createdAt)}
-                                </span>
+                          return (
+                            <div key={comment._id} className="flex items-start gap-2.5">
+                              <Avatar className="size-8 border border-border mt-0.5">
+                                <AvatarImage src={comment.authorId?.avatarUrl} />
+                                <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">
+                                  {comment.authorId?.displayName?.slice(0, 2).toUpperCase() || "U"}
+                                </AvatarFallback>
+                              </Avatar>
+
+                              <div className="flex-1 bg-background/80 border border-border/80 rounded-2xl p-3 shadow-xs">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="font-bold text-xs text-foreground">
+                                    {comment.authorId?.displayName || comment.authorId?.username}
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {formatRelativeTime(comment.createdAt)}
+                                  </span>
+                                </div>
+                                {isSticker ? (
+                                  <div className="pt-1">
+                                    <img
+                                      src={stickerUrl}
+                                      alt={stickerName}
+                                      className="size-20 sm:size-24 object-contain hover:scale-110 active:scale-95 transition-transform cursor-pointer drop-shadow-xs select-none"
+                                      loading="lazy"
+                                    />
+                                  </div>
+                                ) : (
+                                  <p className="text-xs sm:text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                                    {comment.content}
+                                  </p>
+                                )}
                               </div>
-                              <p className="text-xs sm:text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-                                {comment.content}
-                              </p>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Floating Comment Sticker Picker */}
+                    {activeCommentStickerPostId === post._id && (
+                      <div className="pt-2 animate-in fade-in duration-200">
+                        <StickerPicker
+                          onSelectSticker={(sticker) => {
+                            addComment(
+                              post._id,
+                              `[sticker:${sticker.url}:${sticker.name}]`
+                            );
+                            setActiveCommentStickerPostId(null);
+                          }}
+                          onClose={() => setActiveCommentStickerPostId(null)}
+                        />
                       </div>
                     )}
 
@@ -752,32 +825,52 @@ export const CoupleFeedView: React.FC = () => {
                         </AvatarFallback>
                       </Avatar>
 
-                      <div className="flex-1 relative">
-                        <Input
-                          value={commentInputs[post._id] || ""}
-                          onChange={(e) =>
-                            setCommentInputs({
-                              ...commentInputs,
-                              [post._id]: e.target.value,
-                            })
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
-                              e.preventDefault();
-                              handleSendComment(post._id);
-                            }
-                          }}
-                          placeholder="Viết bình luận cho người yêu (Enter để gửi)..."
-                          className="rounded-full text-xs pr-10 bg-background border-border/80"
-                        />
+                      <div className="flex-1 relative flex items-center gap-1.5">
                         <button
                           type="button"
-                          onClick={() => handleSendComment(post._id)}
-                          disabled={!commentInputs[post._id]?.trim()}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-primary hover:opacity-80 disabled:opacity-30 transition-opacity p-1"
+                          onClick={() =>
+                            setActiveCommentStickerPostId(
+                              activeCommentStickerPostId === post._id
+                                ? null
+                                : post._id
+                            )
+                          }
+                          className={`size-8 rounded-full flex items-center justify-center transition-colors shrink-0 ${
+                            activeCommentStickerPostId === post._id
+                              ? "bg-pink-500/20 text-pink-600 dark:text-pink-400"
+                              : "text-muted-foreground hover:text-pink-500 hover:bg-muted"
+                          }`}
+                          title="Bình luận bằng nhãn dán"
                         >
-                          <Send className="size-4" />
+                          <Smile className="size-4 text-pink-500" />
                         </button>
+                        <div className="flex-1 relative">
+                          <Input
+                            value={commentInputs[post._id] || ""}
+                            onChange={(e) =>
+                              setCommentInputs({
+                                ...commentInputs,
+                                [post._id]: e.target.value,
+                              })
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSendComment(post._id);
+                              }
+                            }}
+                            placeholder="Viết bình luận cho người yêu (Enter để gửi)..."
+                            className="rounded-full text-xs pr-10 bg-background border-border/80"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSendComment(post._id)}
+                            disabled={!commentInputs[post._id]?.trim()}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-primary hover:opacity-80 disabled:opacity-30 transition-opacity p-1"
+                          >
+                            <Send className="size-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

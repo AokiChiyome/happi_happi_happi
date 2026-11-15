@@ -6,18 +6,22 @@ import mongoose from "mongoose";
 
 export const sendDirectMessage = async (req, res) => {
   try {
-    const { recipientId, content, conversationId } = req.body;
+    const { recipientId, content, conversationId, imgURL } = req.body;
     const senderId = req.user._id;
 
-    // 1. Kiểm tra tính hợp lệ của nội dung tin nhắn
-    if (!content || typeof content !== "string" || !content.trim()) {
-      return res.status(400).json({ message: "Nội dung tin nhắn không được để trống" });
+    const cleanContent = typeof content === "string" ? content.trim() : "";
+    const cleanImgURL = typeof imgURL === "string" ? imgURL.trim() : "";
+
+    // 1. Kiểm tra tính hợp lệ của nội dung tin nhắn hoặc hình ảnh/nhãn dán
+    if (!cleanContent && !cleanImgURL) {
+      return res.status(400).json({ message: "Vui lòng nhập nội dung hoặc chọn nhãn dán" });
     }
 
-    const cleanContent = content.trim();
     if (cleanContent.length > 3000) {
       return res.status(400).json({ message: "Nội dung tin nhắn tối đa 3000 ký tự" });
     }
+
+    const finalContent = cleanContent || "[Nhãn dán]";
 
     let conversation = null;
 
@@ -75,7 +79,8 @@ export const sendDirectMessage = async (req, res) => {
     const message = await Message.create({
       conversationId: conversation._id,
       senderId,
-      content: cleanContent,
+      content: finalContent,
+      imgURL: cleanImgURL || undefined,
     });
 
     updateconversationAfterCreateMessage(conversation, message, senderId);
@@ -104,21 +109,25 @@ export const sendDirectMessage = async (req, res) => {
 
 export const sendGroupMessage = async (req, res) => {
   try {
-    const { conversationId, content } = req.body;
+    const { conversationId, content, imgURL } = req.body;
     const senderId = req.user._id;
 
     if (!conversationId || !mongoose.Types.ObjectId.isValid(conversationId)) {
       return res.status(400).json({ message: "Mã nhóm không hợp lệ" });
     }
 
-    if (!content || typeof content !== "string" || !content.trim()) {
-      return res.status(400).json({ message: "Nội dung tin nhắn không được để trống" });
+    const cleanContent = typeof content === "string" ? content.trim() : "";
+    const cleanImgURL = typeof imgURL === "string" ? imgURL.trim() : "";
+
+    if (!cleanContent && !cleanImgURL) {
+      return res.status(400).json({ message: "Vui lòng nhập nội dung hoặc chọn nhãn dán" });
     }
 
-    const cleanContent = content.trim();
     if (cleanContent.length > 3000) {
       return res.status(400).json({ message: "Nội dung tin nhắn tối đa 3000 ký tự" });
     }
+
+    const finalContent = cleanContent || "[Nhãn dán]";
 
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) {
@@ -136,7 +145,8 @@ export const sendGroupMessage = async (req, res) => {
     const message = await Message.create({
       conversationId,
       senderId,
-      content: cleanContent,
+      content: finalContent,
+      imgURL: cleanImgURL || undefined,
     });
 
     updateconversationAfterCreateMessage(conversation, message, senderId);

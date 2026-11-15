@@ -51,6 +51,7 @@ export interface Message {
   senderId: string;
   content: string | null;
   imgUrl?: string | null;
+  imgURL?: string | null;
   updatedAt?: string | null;
   createdAt: string;
   sender?: {
