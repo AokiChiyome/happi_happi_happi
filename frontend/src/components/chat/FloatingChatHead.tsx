@@ -211,7 +211,12 @@ export const FloatingChatHead: React.FC = () => {
                         </AvatarFallback>
                       </Avatar>
                     )}
-                    {msg.imgURL || msg.imgUrl ? (
+                    {msg.isRecalled ? (
+                      <div className="max-w-[78%] px-3 py-1.5 rounded-2xl break-words leading-relaxed shadow-xs text-[11px] italic text-muted-foreground bg-muted/40 border border-border/40 flex items-center gap-1">
+                        <span>🚫</span>
+                        <span>Tin nhắn đã được thu hồi</span>
+                      </div>
+                    ) : msg.imgURL || msg.imgUrl ? (
                       <div className="p-0.5 rounded-2xl hover:scale-110 active:scale-95 transition-transform">
                         <img
                           src={msg.imgURL || msg.imgUrl || ""}

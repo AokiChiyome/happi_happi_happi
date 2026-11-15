@@ -15,9 +15,16 @@ import {
   Users,
   Search,
   Smile,
+  CornerUpLeft,
+  Undo2,
+  X,
+  Ban,
 } from "lucide-react";
 import StickerPicker from "./StickerPicker";
 import type { Sticker } from "@/data/stickersData";
+import type { Message } from "@/types/chat";
+
+const QUICK_EMOJIS = ["❤️", "😂", "😮", "😢", "👍", "🔥"];
 
 export const ChatWindowLayout: React.FC = () => {
   const { user } = useAuthStore();
@@ -30,10 +37,16 @@ export const ChatWindowLayout: React.FC = () => {
     setFoodRouletteOpen,
     typingStatus,
     sendTyping,
+    replyingToMessage,
+    setReplyingToMessage,
+    toggleMessageReaction,
+    recallMessage,
   } = useChatStore();
 
   const [inputContent, setInputContent] = useState("");
   const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const [activeReactionPickerId, setActiveReactionPickerId] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<any>(null);
 
@@ -62,7 +75,7 @@ export const ChatWindowLayout: React.FC = () => {
   const chatAvatar =
     activeConvo?.type === "group" ? undefined : otherUser?.avatarUrl || undefined;
 
-  // Auto-scroll on new message or when other user is typing
+  // Tự động cuộn xuống cuối khi có tin nhắn mới hoặc đối phương đang gõ
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [currentMessages.length, currentTyping?.isTyping]);
@@ -104,7 +117,37 @@ export const ChatWindowLayout: React.FC = () => {
     setShowStickerPicker(false);
   };
 
-  // If no active conversation, show Welcome Empty State
+  // Cuộn tới tin nhắn được trích dẫn (Reply)
+  const scrollToMessage = (messageId?: string) => {
+    if (!messageId) return;
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("ring-2", "ring-pink-500", "rounded-2xl");
+      setTimeout(() => {
+        el.classList.remove("ring-2", "ring-pink-500", "rounded-2xl");
+      }, 1500);
+    }
+  };
+
+  // Nhóm các reaction theo emoji để hiển thị số lượng
+  const getGroupedReactions = (reactions?: Message["reactions"]) => {
+    if (!reactions || reactions.length === 0) return [];
+    const map: Record<string, { count: number; reactedByMe: boolean }> = {};
+    reactions.forEach((r) => {
+      const emoji = r.emoji;
+      const isMine =
+        (typeof r.userId === "string" ? r.userId : r.userId?._id) === user?._id;
+      if (!map[emoji]) {
+        map[emoji] = { count: 0, reactedByMe: false };
+      }
+      map[emoji].count++;
+      if (isMine) map[emoji].reactedByMe = true;
+    });
+    return Object.entries(map);
+  };
+
+  // Nếu chưa chọn hội thoại, hiển thị màn hình chào mừng
   if (!activeConversationId || !activeConvo) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-card/40 rounded-3xl border border-border/50">
@@ -186,7 +229,6 @@ export const ChatWindowLayout: React.FC = () => {
 
         {/* Header Action Tools */}
         <div className="flex items-center gap-2">
-          {/* Quick Food Decider Trigger */}
           <Button
             size="sm"
             onClick={() => setFoodRouletteOpen(true)}
@@ -220,6 +262,8 @@ export const ChatWindowLayout: React.FC = () => {
               msg.content && msg.content.includes("🍽️ [Gợi ý món ăn]:");
             const stickerSrc = msg.imgURL || msg.imgUrl;
             const isSticker = Boolean(stickerSrc);
+            const isRecalled = Boolean(msg.isRecalled);
+            const groupedReactions = getGroupedReactions(msg.reactions);
 
             const timeStr = msg.createdAt
               ? new Date(msg.createdAt).toLocaleTimeString([], {
@@ -231,12 +275,106 @@ export const ChatWindowLayout: React.FC = () => {
             return (
               <div
                 key={msg._id}
-                className={`flex flex-col ${
+                id={`msg-${msg._id}`}
+                className={`flex flex-col relative group transition-all duration-150 ${
                   isMine ? "items-end" : "items-start"
-                } animate-in fade-in-50 duration-200`}
+                }`}
               >
-                {/* 1. Special Food Card Rendering */}
-                {isFoodCard ? (
+                {/* THANH CÔNG CỤ HOVER TRÊN TIN NHẮN (REACT, REPLY, THU HỒI) */}
+                {!isRecalled && !msg._id.startsWith("temp-") && (
+                  <div
+                    className={`absolute top-0 -translate-y-1/2 ${
+                      isMine ? "-left-20" : "-right-20"
+                    } hidden group-hover:flex items-center gap-1 bg-background/95 dark:bg-zinc-900/95 border border-border/80 rounded-full px-1.5 py-0.5 shadow-md z-20 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-100`}
+                  >
+                    {/* Nút Thả Cảm Xúc (Reaction Picker) */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setActiveReactionPickerId(
+                            activeReactionPickerId === msg._id ? null : msg._id
+                          )
+                        }
+                        className="size-6 rounded-full hover:bg-muted flex items-center justify-center text-xs text-muted-foreground hover:text-pink-500 transition-colors"
+                        title="Bày tỏ cảm xúc"
+                      >
+                        <Smile className="size-3.5" />
+                      </button>
+
+                      {/* Bảng biểu tượng cảm xúc trôi nổi */}
+                      {activeReactionPickerId === msg._id && (
+                        <div
+                          className={`absolute bottom-8 ${
+                            isMine ? "right-0" : "left-0"
+                          } flex items-center gap-1 bg-card/95 backdrop-blur-md border border-border/90 rounded-full p-1.5 shadow-xl z-40 animate-in zoom-in-90 duration-150`}
+                        >
+                          {QUICK_EMOJIS.map((emoji) => (
+                            <button
+                              key={emoji}
+                              type="button"
+                              onClick={() => {
+                                toggleMessageReaction(msg._id, emoji);
+                                setActiveReactionPickerId(null);
+                              }}
+                              className="size-7 rounded-full hover:bg-muted flex items-center justify-center text-base transition-transform hover:scale-135 active:scale-95"
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Nút Trả Lời (Reply) */}
+                    <button
+                      type="button"
+                      onClick={() => setReplyingToMessage(msg)}
+                      className="size-6 rounded-full hover:bg-muted flex items-center justify-center text-xs text-muted-foreground hover:text-primary transition-colors"
+                      title="Trả lời tin nhắn này"
+                    >
+                      <CornerUpLeft className="size-3.5" />
+                    </button>
+
+                    {/* Nút Thu hồi tin nhắn (Chỉ người gửi mới có quyền) */}
+                    {isMine && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              "Bạn có chắc chắn muốn thu hồi tin nhắn này không?"
+                            )
+                          ) {
+                            recallMessage(msg._id);
+                          }
+                        }}
+                        className="size-6 rounded-full hover:bg-red-500/10 flex items-center justify-center text-xs text-muted-foreground hover:text-red-500 transition-colors"
+                        title="Thu hồi tin nhắn"
+                      >
+                        <Undo2 className="size-3.5" />
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* 1. TIN NHẮN ĐÃ ĐƯỢC THU HỒI */}
+                {isRecalled ? (
+                  <div className="max-w-[78%]">
+                    <div className="px-3.5 py-2 rounded-2xl text-xs italic text-muted-foreground flex items-center gap-2 bg-muted/30 border border-border/40 select-none">
+                      <Ban className="size-3.5 text-muted-foreground/60" />
+                      <span>Tin nhắn đã được thu hồi</span>
+                    </div>
+                    <span
+                      className={`text-[10px] text-muted-foreground block px-1 mt-0.5 ${
+                        isMine ? "text-right" : "text-left"
+                      }`}
+                    >
+                      {timeStr}
+                    </span>
+                  </div>
+                ) : isFoodCard ? (
+                  /* 2. THẺ GỢI Ý MÓN ĂN */
                   <div className="max-w-md w-full bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/30 border-2 border-amber-300 dark:border-amber-700/60 rounded-3xl p-4 shadow-md text-foreground">
                     <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-1">
                       <span>🍽️</span> Gợi ý món ăn tình yêu
@@ -277,8 +415,28 @@ export const ChatWindowLayout: React.FC = () => {
                     </div>
                   </div>
                 ) : isSticker ? (
-                  /* 2. Messenger / Telegram Floating Sticker Rendering */
+                  /* 3. NHÃN DÁN STICKER */
                   <div className="max-w-[78%] flex flex-col my-1 group">
+                    {/* Trích dẫn nếu là tin nhắn Reply */}
+                    {msg.replyTo && (
+                      <div
+                        onClick={() => scrollToMessage(msg.replyTo?.messageId)}
+                        className={`mb-1 px-2.5 py-1 rounded-xl text-xs flex flex-col cursor-pointer transition-opacity hover:opacity-100 ${
+                          isMine
+                            ? "bg-muted/80 text-foreground border-l-2 border-primary/80 self-end"
+                            : "bg-muted/80 text-foreground border-l-2 border-primary/80 self-start"
+                        }`}
+                      >
+                        <span className="font-bold text-[10px] flex items-center gap-1 opacity-90">
+                          <CornerUpLeft className="size-2.5 inline" />
+                          {msg.replyTo.senderName || "Người dùng"}
+                        </span>
+                        <span className="truncate text-[10px] opacity-80 max-w-xs">
+                          {msg.replyTo.content || "[Hình ảnh/Nhãn dán]"}
+                        </span>
+                      </div>
+                    )}
+
                     <div className="p-1 rounded-3xl hover:bg-muted/40 transition-colors inline-block">
                       <img
                         src={stickerSrc || ""}
@@ -309,7 +467,7 @@ export const ChatWindowLayout: React.FC = () => {
                     </span>
                   </div>
                 ) : (
-                  /* 3. Standard Chat Bubble */
+                  /* 4. BONG BÓNG TIN NHẮN TIÊU CHUẨN */
                   <div className="max-w-[78%]">
                     <div
                       className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words shadow-sm ${
@@ -318,8 +476,29 @@ export const ChatWindowLayout: React.FC = () => {
                           : "bg-card text-foreground border border-border/80 rounded-bl-xs"
                       }`}
                     >
+                      {/* Trích dẫn tin nhắn Reply */}
+                      {msg.replyTo && (
+                        <div
+                          onClick={() => scrollToMessage(msg.replyTo?.messageId)}
+                          className={`mb-2 px-2.5 py-1 rounded-xl text-xs flex flex-col cursor-pointer transition-opacity hover:opacity-100 ${
+                            isMine
+                              ? "bg-white/20 text-white/95 border-l-2 border-white/80"
+                              : "bg-muted/80 text-foreground border-l-2 border-primary/80"
+                          }`}
+                        >
+                          <span className="font-bold text-[10px] flex items-center gap-1 opacity-90">
+                            <CornerUpLeft className="size-2.5 inline" />
+                            {msg.replyTo.senderName || "Người dùng"}
+                          </span>
+                          <span className="truncate text-[10px] opacity-80 max-w-xs">
+                            {msg.replyTo.content || "[Hình ảnh/Nhãn dán]"}
+                          </span>
+                        </div>
+                      )}
+
                       {msg.content}
                     </div>
+
                     <span
                       className={`text-[10px] text-muted-foreground block px-1 mt-0.5 ${
                         isMine ? "text-right" : "text-left"
@@ -327,6 +506,38 @@ export const ChatWindowLayout: React.FC = () => {
                     >
                       {msg._id.startsWith("temp-") ? "Đang gửi... ✨" : timeStr}
                     </span>
+                  </div>
+                )}
+
+                {/* DANH SÁCH BIỂU TƯỢNG CẢM XÚC (REACTIONS BADGE) */}
+                {groupedReactions.length > 0 && !isRecalled && (
+                  <div
+                    className={`flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-full text-[11px] bg-background/90 dark:bg-zinc-800/90 border border-border/70 shadow-xs select-none ${
+                      isMine ? "self-end" : "self-start"
+                    }`}
+                  >
+                    {groupedReactions.map(([emoji, info]) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => toggleMessageReaction(msg._id, emoji)}
+                        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full transition-transform hover:scale-115 ${
+                          info.reactedByMe
+                            ? "bg-pink-500/20 text-pink-600 dark:text-pink-400 font-bold border border-pink-500/30"
+                            : "hover:bg-muted text-foreground"
+                        }`}
+                        title={
+                          info.reactedByMe
+                            ? "Bạn đã thả cảm xúc này (Bấm để gỡ)"
+                            : "Bấm để thả cảm xúc"
+                        }
+                      >
+                        <span>{emoji}</span>
+                        {info.count > 1 && (
+                          <span className="text-[10px]">{info.count}</span>
+                        )}
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -356,6 +567,33 @@ export const ChatWindowLayout: React.FC = () => {
 
       {/* ================= CHAT INPUT TOOLBAR ================= */}
       <footer className="p-4 border-t border-border/50 bg-background/50 backdrop-blur-sm space-y-2 relative">
+        {/* THANH XEM TRƯỚC TIN NHẮN ĐANG TRẢ LỜI (REPLY BANNER) */}
+        {replyingToMessage && (
+          <div className="px-4 py-2 bg-pink-500/10 dark:bg-pink-950/30 border border-pink-500/20 rounded-2xl flex items-center justify-between text-xs animate-in slide-in-from-bottom-2 duration-150">
+            <div className="flex items-center gap-2 overflow-hidden">
+              <CornerUpLeft className="size-4 text-pink-500 shrink-0" />
+              <div className="truncate">
+                <span className="font-bold text-foreground mr-1">
+                  Đang trả lời{" "}
+                  {replyingToMessage.sender?.displayName || "Người dùng"}:
+                </span>
+                <span className="text-muted-foreground italic">
+                  "{replyingToMessage.content || (replyingToMessage.imgURL ? "[Nhãn dán]" : "")}"
+                </span>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setReplyingToMessage(null)}
+              className="size-6 rounded-full hover:bg-pink-500/20 text-muted-foreground hover:text-pink-600 shrink-0"
+              title="Hủy trả lời"
+            >
+              <X className="size-3.5" />
+            </Button>
+          </div>
+        )}
+
         {/* Floating Sticker Picker Popover */}
         {showStickerPicker && (
           <div className="absolute bottom-20 left-4 z-40">
@@ -411,7 +649,11 @@ export const ChatWindowLayout: React.FC = () => {
           <Input
             value={inputContent}
             onChange={handleInputChange}
-            placeholder={`Nhắn tin cho ${chatTitle}...`}
+            placeholder={
+              replyingToMessage
+                ? `Nhập câu trả lời cho ${replyingToMessage.sender?.displayName || "tin nhắn"}...`
+                : `Nhắn tin cho ${chatTitle}...`
+            }
             className="flex-1 bg-muted/30 border-border/80 rounded-2xl px-4 py-2 text-sm focus-visible:ring-primary/40"
           />
           <Button

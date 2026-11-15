@@ -3,6 +3,8 @@ import {
   sendDirectMessage,
   sendGroupMessage,
   setTypingStatus,
+  toggleMessageReaction,
+  recallMessage,
 } from "../controllers/messageController.js";
 import {
   CheckFriendship,
@@ -20,9 +22,19 @@ const messageSendLimiter = rateLimit({
   message: "Bạn đang gửi tin nhắn quá nhanh. Hãy chờ giây lát nhé! 💕",
 });
 
+const reactionLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  message: "Thao tác cảm xúc quá nhanh. Hãy chờ giây lát nhé! ✨",
+});
+
 router.get("/stream", streamMessages);
 router.post("/direct", messageSendLimiter, CheckFriendship, sendDirectMessage);
 router.post("/group", messageSendLimiter, CheckGroupMembership, sendGroupMessage);
 router.post("/typing", setTypingStatus);
+
+// Tương tác Reaction & Thu hồi tin nhắn
+router.post("/:messageId/reaction", reactionLimiter, toggleMessageReaction);
+router.patch("/:messageId/recall", recallMessage);
 
 export default router;

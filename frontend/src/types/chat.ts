@@ -45,6 +45,26 @@ export interface ConversationResponse {
   conversations: Conversation[];
 }
 
+export interface MessageReaction {
+  userId:
+    | string
+    | {
+        _id: string;
+        displayName?: string;
+        avatarUrl?: string | null;
+        username?: string;
+      };
+  emoji: string;
+  createdAt?: string;
+}
+
+export interface MessageReplyTo {
+  messageId: string;
+  senderName?: string;
+  content?: string | null;
+  imgURL?: string | null;
+}
+
 export interface Message {
   _id: string;
   conversationId: string;
@@ -54,6 +74,10 @@ export interface Message {
   imgURL?: string | null;
   updatedAt?: string | null;
   createdAt: string;
+  isRecalled?: boolean;
+  recalledAt?: string;
+  reactions?: MessageReaction[];
+  replyTo?: MessageReplyTo;
   sender?: {
     _id: string;
     displayName: string;

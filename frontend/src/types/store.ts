@@ -45,11 +45,13 @@ export interface ChatState {
   currentTab: "chat" | "feed";
   loading: boolean;
   typingStatus: Record<string, { userId: string; displayName: string; isTyping: boolean }>;
+  replyingToMessage: Message | null;
 
   reset: () => void;
   setActiveConversation: (id: string | null) => void;
   setCurrentTab: (tab: "chat" | "feed") => void;
   setFoodRouletteOpen: (open: boolean) => void;
+  setReplyingToMessage: (message: Message | null) => void;
   fetchConversations: () => Promise<void>;
   fetchMessages: (conversationId: string) => Promise<void>;
   sendMessage: (
@@ -62,6 +64,8 @@ export interface ChatState {
     altText?: string,
     recipientId?: string
   ) => Promise<void>;
+  toggleMessageReaction: (messageId: string, emoji: string) => Promise<void>;
+  recallMessage: (messageId: string) => Promise<void>;
   sendFoodCard: (dish: {
     name: string;
     category: string;

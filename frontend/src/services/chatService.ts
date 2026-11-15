@@ -24,13 +24,20 @@ export const chatService = {
     recipientId?: string,
     content?: string,
     conversationId?: string,
-    imgURL?: string
+    imgURL?: string,
+    replyTo?: {
+      messageId: string;
+      senderName?: string;
+      content?: string | null;
+      imgURL?: string | null;
+    }
   ): Promise<{ message: Message }> {
     const res = await api.post("/messages/direct", {
       recipientId,
       content,
       conversationId,
       imgURL,
+      replyTo,
     });
     return res.data;
   },
@@ -38,13 +45,35 @@ export const chatService = {
   async sendGroupMessage(
     conversationId: string,
     content?: string,
-    imgURL?: string
+    imgURL?: string,
+    replyTo?: {
+      messageId: string;
+      senderName?: string;
+      content?: string | null;
+      imgURL?: string | null;
+    }
   ): Promise<{ message: Message }> {
     const res = await api.post("/messages/group", {
       conversationId,
       content,
       imgURL,
+      replyTo,
     });
+    return res.data;
+  },
+
+  async toggleMessageReaction(
+    messageId: string,
+    emoji: string
+  ): Promise<{ messageId: string; reactions: any[] }> {
+    const res = await api.post(`/messages/${messageId}/reaction`, { emoji });
+    return res.data;
+  },
+
+  async recallMessage(
+    messageId: string
+  ): Promise<{ messageId: string; isRecalled: boolean; recalledAt: string }> {
+    const res = await api.patch(`/messages/${messageId}/recall`);
     return res.data;
   },
 

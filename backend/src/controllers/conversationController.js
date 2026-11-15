@@ -198,7 +198,8 @@ export const getMessage = async (req, res) => {
 
     let messages = await Message.find(query)
       .sort({ createdAt: -1 })
-      .limit(safeLimit + 1);
+      .limit(safeLimit + 1)
+      .populate("reactions.userId", "_id displayName avatarUrl username");
 
     let nextCursor = null;
 
@@ -210,7 +211,11 @@ export const getMessage = async (req, res) => {
 
     messages = messages.reverse().map((msg) => {
       const obj = msg.toObject();
-      if (obj.content) {
+      if (obj.isRecalled) {
+        obj.content = "Tin nhắn đã được thu hồi";
+        obj.imgURL = undefined;
+        obj.reactions = [];
+      } else if (obj.content) {
         obj.content = decryptText(obj.content);
       }
       return obj;

@@ -20,6 +20,48 @@ const messageSchema = new mongoose.Schema(
     imgURL: {
       type: String,
     },
+    // Trạng thái thu hồi tin nhắn (Unsend / Recall)
+    isRecalled: {
+      type: Boolean,
+      default: false,
+    },
+    recalledAt: {
+      type: Date,
+    },
+    // Thả cảm xúc / react icon trên tin nhắn
+    reactions: [
+      {
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        emoji: {
+          type: String,
+          required: true,
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+    // Trả lời / Reply trích dẫn tin nhắn
+    replyTo: {
+      messageId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Message",
+      },
+      senderName: {
+        type: String,
+      },
+      content: {
+        type: String,
+      },
+      imgURL: {
+        type: String,
+      },
+    },
   },
   { timestamps: true }
 );

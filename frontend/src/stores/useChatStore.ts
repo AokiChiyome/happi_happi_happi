@@ -1,6 +1,6 @@
 import { chatService } from "@/services/chatService";
 import type { ChatState } from "@/types/store";
-import type { Message } from "@/types/chat";
+import type { Message, Conversation } from "@/types/chat";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useAuthStore } from "./useAuthStore";
@@ -23,6 +23,7 @@ export const useChatStore = create<ChatState>()(
       currentTab: "chat",
       loading: false,
       typingStatus: {},
+      replyingToMessage: null,
 
       setActiveConversation: (id) => {
         set({ activeConversationId: id, currentTab: "chat" });
@@ -35,6 +36,8 @@ export const useChatStore = create<ChatState>()(
       setCurrentTab: (tab: "chat" | "feed") => set({ currentTab: tab }),
 
       setFoodRouletteOpen: (open) => set({ isFoodRouletteOpen: open }),
+
+      setReplyingToMessage: (message) => set({ replyingToMessage: message }),
 
       sendTyping: (conversationId: string, isTyping: boolean) => {
         chatService.setTyping(conversationId, isTyping);
@@ -59,6 +62,7 @@ export const useChatStore = create<ChatState>()(
           currentTab: "chat",
           loading: false,
           typingStatus: {},
+          replyingToMessage: null,
         });
       },
 
@@ -114,6 +118,20 @@ export const useChatStore = create<ChatState>()(
         const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
         const nowIso = new Date().toISOString();
 
+        const replyingTo = get().replyingToMessage;
+        const replyToPayload = replyingTo
+          ? {
+              messageId: replyingTo._id,
+              senderName: replyingTo.sender?.displayName || "Người dùng",
+              content: replyingTo.content || (replyingTo.imgURL ? "[Nhãn dán]" : ""),
+              imgURL: replyingTo.imgURL || undefined,
+            }
+          : undefined;
+
+        if (replyingTo) {
+          set({ replyingToMessage: null });
+        }
+
         // 1. OPTIMISTIC UI: Hiển thị ngay lập tức không có độ trễ (0ms latency)
         if (targetConvoId) {
           const optimisticMsg: Message = {
@@ -123,6 +141,7 @@ export const useChatStore = create<ChatState>()(
             content: content || null,
             imgURL: imgURL || undefined,
             createdAt: nowIso,
+            replyTo: replyToPayload,
             sender: {
               _id: currentUser?._id || "me",
               displayName: currentUser?.displayName || "Tôi",
@@ -184,14 +203,16 @@ export const useChatStore = create<ChatState>()(
             res = await chatService.sendGroupMessage(
               activeConversationId,
               content,
-              imgURL
+              imgURL,
+              replyToPayload
             );
           } else {
             res = await chatService.sendDirectMessage(
               finalRecipientId,
               content,
               activeConversationId ?? undefined,
-              imgURL
+              imgURL,
+              replyToPayload
             );
           }
 
@@ -310,6 +331,112 @@ export const useChatStore = create<ChatState>()(
         } catch (error) {
           console.error("Lỗi chia sẻ món ăn", error);
           toast.error("Không thể gửi gợi ý món ăn vào chat");
+        }
+      },
+
+      toggleMessageReaction: async (messageId: string, emoji: string) => {
+        const { activeConversationId } = get();
+        if (!activeConversationId) return;
+
+        const currentUser = useAuthStore.getState().user;
+        if (!currentUser) return;
+
+        // Cập nhật Optimistic reaction ngay lập tức trên UI
+        set((state) => {
+          const items = state.messages[activeConversationId]?.items || [];
+          const updated = items.map((m) => {
+            if (m._id !== messageId) return m;
+            const reactions = [...(m.reactions || [])];
+            const idx = reactions.findIndex(
+              (r) =>
+                (typeof r.userId === "string" ? r.userId : r.userId._id) ===
+                currentUser._id
+            );
+            if (idx > -1) {
+              if (reactions[idx].emoji === emoji) {
+                reactions.splice(idx, 1);
+              } else {
+                reactions[idx] = { ...reactions[idx], emoji };
+              }
+            } else {
+              reactions.push({
+                userId: {
+                  _id: currentUser._id,
+                  displayName: currentUser.displayName,
+                  avatarUrl: currentUser.avatarUrl,
+                },
+                emoji,
+              });
+            }
+            return { ...m, reactions };
+          });
+          return {
+            messages: {
+              ...state.messages,
+              [activeConversationId]: {
+                ...state.messages[activeConversationId],
+                items: updated,
+              },
+            },
+          };
+        });
+
+        try {
+          const res = await chatService.toggleMessageReaction(messageId, emoji);
+          if (res?.reactions) {
+            set((state) => {
+              const items = state.messages[activeConversationId]?.items || [];
+              const updated = items.map((m) =>
+                m._id === messageId ? { ...m, reactions: res.reactions } : m
+              );
+              return {
+                messages: {
+                  ...state.messages,
+                  [activeConversationId]: {
+                    ...state.messages[activeConversationId],
+                    items: updated,
+                  },
+                },
+              };
+            });
+          }
+        } catch (e) {
+          console.error("Lỗi toggle reaction", e);
+        }
+      },
+
+      recallMessage: async (messageId: string) => {
+        const { activeConversationId } = get();
+        try {
+          await chatService.recallMessage(messageId);
+          toast.success("Đã thu hồi tin nhắn thành công");
+          if (activeConversationId) {
+            set((state) => {
+              const items = state.messages[activeConversationId]?.items || [];
+              const updated = items.map((m) =>
+                m._id === messageId
+                  ? {
+                      ...m,
+                      isRecalled: true,
+                      content: "Tin nhắn đã được thu hồi",
+                      imgURL: undefined,
+                      reactions: [],
+                    }
+                  : m
+              );
+              return {
+                messages: {
+                  ...state.messages,
+                  [activeConversationId]: {
+                    ...state.messages[activeConversationId],
+                    items: updated,
+                  },
+                },
+              };
+            });
+          }
+        } catch (e: any) {
+          toast.error(e.response?.data?.message || "Không thể thu hồi tin nhắn");
         }
       },
 
@@ -503,6 +630,70 @@ export const useChatStore = create<ChatState>()(
                     toast.info("📸 Người yêu vừa đăng bài viết mới lên Nhật ký! 💕");
                   }
                 }
+                return;
+              }
+
+              if (payload.type === "message_reaction") {
+                const { conversationId, messageId, reactions } = payload;
+                set((state) => {
+                  const convoMessages = state.messages[conversationId];
+                  if (!convoMessages) return state;
+                  const updatedItems = convoMessages.items.map((m) =>
+                    m._id === messageId ? { ...m, reactions } : m
+                  );
+                  return {
+                    messages: {
+                      ...state.messages,
+                      [conversationId]: {
+                        ...convoMessages,
+                        items: updatedItems,
+                      },
+                    },
+                  };
+                });
+                return;
+              }
+
+              if (payload.type === "message_recalled") {
+                const { conversationId, messageId, recalledAt } = payload;
+                set((state) => {
+                  const convoMessages = state.messages[conversationId];
+                  if (!convoMessages) return state;
+                  const updatedItems = convoMessages.items.map((m) =>
+                    m._id === messageId
+                      ? {
+                          ...m,
+                          isRecalled: true,
+                          recalledAt,
+                          content: "Tin nhắn đã được thu hồi",
+                          imgURL: undefined,
+                          reactions: [],
+                        }
+                      : m
+                  );
+                  const updatedConvos: Conversation[] = state.conversations.map((c) => {
+                    if (c._id === conversationId && c.lastMessage && c.lastMessage._id === messageId) {
+                      return {
+                        ...c,
+                        lastMessage: {
+                          ...c.lastMessage,
+                          content: "Tin nhắn đã được thu hồi",
+                        },
+                      };
+                    }
+                    return c;
+                  });
+                  return {
+                    messages: {
+                      ...state.messages,
+                      [conversationId]: {
+                        ...convoMessages,
+                        items: updatedItems,
+                      },
+                    },
+                    conversations: updatedConvos,
+                  };
+                });
                 return;
               }
 
