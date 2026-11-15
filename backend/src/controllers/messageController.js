@@ -20,23 +20,25 @@ const sanitizeReplyTo = (replyTo) => {
 
 export const sendDirectMessage = async (req, res) => {
   try {
-    const { recipientId, content, conversationId, imgURL, replyTo } = req.body;
+    const { recipientId, content, conversationId, imgURL, replyTo, audioURL, audioDuration } = req.body;
     const senderId = req.user._id;
 
     const cleanContent = typeof content === "string" ? content.trim() : "";
     const cleanImgURL = typeof imgURL === "string" ? imgURL.trim() : "";
+    const cleanAudioURL = typeof audioURL === "string" ? audioURL.trim() : "";
+    const safeAudioDuration = typeof audioDuration === "number" ? Math.round(audioDuration) : 0;
     const cleanReplyTo = sanitizeReplyTo(replyTo);
 
-    // 1. Kiểm tra tính hợp lệ của nội dung tin nhắn hoặc hình ảnh/nhãn dán
-    if (!cleanContent && !cleanImgURL) {
-      return res.status(400).json({ message: "Vui lòng nhập nội dung hoặc chọn nhãn dán" });
+    // 1. Kiểm tra tính hợp lệ của nội dung tin nhắn hoặc hình ảnh/nhãn dán/ghi âm
+    if (!cleanContent && !cleanImgURL && !cleanAudioURL) {
+      return res.status(400).json({ message: "Vui lòng nhập nội dung, chọn nhãn dán hoặc gửi ghi âm" });
     }
 
     if (cleanContent.length > 3000) {
       return res.status(400).json({ message: "Nội dung tin nhắn tối đa 3000 ký tự" });
     }
 
-    const finalContent = cleanContent || "[Nhãn dán]";
+    const finalContent = cleanContent || (cleanAudioURL ? "[Tin nhắn thoại]" : "[Nhãn dán]");
 
     let conversation = null;
 
@@ -97,6 +99,8 @@ export const sendDirectMessage = async (req, res) => {
       senderId,
       content: encryptedContent,
       imgURL: cleanImgURL || undefined,
+      audioURL: cleanAudioURL || undefined,
+      audioDuration: safeAudioDuration || undefined,
       replyTo: cleanReplyTo || undefined,
     });
 
@@ -110,6 +114,8 @@ export const sendDirectMessage = async (req, res) => {
       ...message.toObject(),
       content: finalContent, // Gửi nội dung đã giải mã cho người tham gia
       replyTo: cleanReplyTo || undefined,
+      audioURL: cleanAudioURL || undefined,
+      audioDuration: safeAudioDuration || undefined,
     };
 
     chatEmitter.emit("new_message", {
@@ -132,7 +138,7 @@ export const sendDirectMessage = async (req, res) => {
 
 export const sendGroupMessage = async (req, res) => {
   try {
-    const { conversationId, content, imgURL, replyTo } = req.body;
+    const { conversationId, content, imgURL, replyTo, audioURL, audioDuration } = req.body;
     const senderId = req.user._id;
 
     if (!conversationId || !mongoose.Types.ObjectId.isValid(conversationId)) {
@@ -141,17 +147,19 @@ export const sendGroupMessage = async (req, res) => {
 
     const cleanContent = typeof content === "string" ? content.trim() : "";
     const cleanImgURL = typeof imgURL === "string" ? imgURL.trim() : "";
+    const cleanAudioURL = typeof audioURL === "string" ? audioURL.trim() : "";
+    const safeAudioDuration = typeof audioDuration === "number" ? Math.round(audioDuration) : 0;
     const cleanReplyTo = sanitizeReplyTo(replyTo);
 
-    if (!cleanContent && !cleanImgURL) {
-      return res.status(400).json({ message: "Vui lòng nhập nội dung hoặc chọn nhãn dán" });
+    if (!cleanContent && !cleanImgURL && !cleanAudioURL) {
+      return res.status(400).json({ message: "Vui lòng nhập nội dung, chọn nhãn dán hoặc gửi ghi âm" });
     }
 
     if (cleanContent.length > 3000) {
       return res.status(400).json({ message: "Nội dung tin nhắn tối đa 3000 ký tự" });
     }
 
-    const finalContent = cleanContent || "[Nhãn dán]";
+    const finalContent = cleanContent || (cleanAudioURL ? "[Tin nhắn thoại]" : "[Nhãn dán]");
 
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) {
@@ -172,6 +180,8 @@ export const sendGroupMessage = async (req, res) => {
       senderId,
       content: encryptedContent,
       imgURL: cleanImgURL || undefined,
+      audioURL: cleanAudioURL || undefined,
+      audioDuration: safeAudioDuration || undefined,
       replyTo: cleanReplyTo || undefined,
     });
 
@@ -185,6 +195,8 @@ export const sendGroupMessage = async (req, res) => {
       ...message.toObject(),
       content: finalContent,
       replyTo: cleanReplyTo || undefined,
+      audioURL: cleanAudioURL || undefined,
+      audioDuration: safeAudioDuration || undefined,
     };
 
     chatEmitter.emit("new_message", {

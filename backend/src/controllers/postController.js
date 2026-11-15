@@ -39,7 +39,24 @@ export const getCoupleFeed = async (req, res) => {
 
     const coupleKey = pair(userId, partner._id.toString());
 
-    const rawPosts = await Post.find({ coupleKey })
+    const now = new Date();
+
+    // Lấy Story 24h còn hạn
+    const rawStories = await Post.find({
+      coupleKey,
+      isStory: true,
+      expiresAt: { $gt: now },
+    })
+      .sort({ createdAt: -1 })
+      .populate("authorId", "_id username displayName avatarUrl")
+      .populate("reactions.userId", "_id username displayName avatarUrl")
+      .lean();
+
+    // Lấy bài viết bảng tin thường
+    const rawPosts = await Post.find({
+      coupleKey,
+      isStory: { $ne: true },
+    })
       .sort({ createdAt: -1 })
       .populate("authorId", "_id username displayName avatarUrl")
       .populate("partnerId", "_id username displayName avatarUrl")
@@ -47,6 +64,11 @@ export const getCoupleFeed = async (req, res) => {
       .lean();
 
     // Giải mã nội dung AES-256-GCM bảo đảm hiển thị văn bản ban đầu
+    const stories = rawStories.map((s) => ({
+      ...s,
+      content: decryptText(s.content),
+    }));
+
     const posts = rawPosts.map((post) => ({
       ...post,
       content: decryptText(post.content),
@@ -60,6 +82,7 @@ export const getCoupleFeed = async (req, res) => {
         displayName: partner.displayName,
         avatarUrl: partner.avatarUrl,
       },
+      stories,
       posts,
     });
   } catch (error) {
@@ -72,7 +95,7 @@ export const getCoupleFeed = async (req, res) => {
 export const createPost = async (req, res) => {
   try {
     const userId = req.user._id.toString();
-    const { content, images, foodDish, feeling } = req.body;
+    const { content, images, foodDish, feeling, isStory } = req.body;
 
     if (!content || typeof content !== "string" || !content.trim()) {
       return res.status(400).json({ message: "Vui lòng nhập nội dung bài viết" });
@@ -96,6 +119,9 @@ export const createPost = async (req, res) => {
       ? images.filter((img) => typeof img === "string" && img.trim().length > 0)
       : [];
 
+    const isStoryPost = isStory === true || isStory === "true";
+    const expiresAt = isStoryPost ? new Date(Date.now() + 24 * 60 * 60 * 1000) : undefined;
+
     const newPost = await Post.create({
       coupleKey,
       authorId: userId,
@@ -106,6 +132,8 @@ export const createPost = async (req, res) => {
       feeling: typeof feeling === "string" ? feeling.trim() : "",
       reactions: [],
       commentsCount: 0,
+      isStory: isStoryPost,
+      expiresAt,
     });
 
     const populated = await Post.findById(newPost._id)

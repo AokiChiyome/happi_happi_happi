@@ -78,6 +78,14 @@ const conversationSchema = new mongoose.Schema(
       of: Number,
       default: {},
     },
+    // Ghim tin nhắn quan trọng trong cuộc trò chuyện (Telegram-style Pinned Message)
+    pinnedMessage: {
+      messageId: { type: mongoose.Schema.Types.ObjectId, ref: "Message" },
+      senderName: { type: String },
+      content: { type: String },
+      pinnedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      pinnedAt: { type: Date, default: Date.now },
+    },
   },
   { timestamps: true },
 );

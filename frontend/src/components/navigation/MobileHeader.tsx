@@ -3,7 +3,8 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { useChatStore } from "@/stores/useChatStore";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { Download, Sparkles } from "lucide-react";
+import { usePWAInstall } from "@/hooks/usePWAInstall";
+import { Download } from "lucide-react";
 import UserAvatar from "@/components/chat/UserAvatar";
 
 interface MobileHeaderProps {
@@ -15,6 +16,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
 }) => {
   const { currentTab, activeConversationId, conversations } = useChatStore();
   const { user } = useAuthStore();
+  const { isInstalled, isStandalone } = usePWAInstall();
 
   const activeConvo = conversations.find((c) => c._id === activeConversationId);
   const otherUser =
@@ -37,17 +39,19 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
       </div>
 
       <div className="flex items-center gap-2">
-        {/* Nút Cài đặt App PWA trực tiếp trên Header */}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onOpenInstallModal}
-          className="h-8 px-2.5 text-xs font-bold gap-1 rounded-xl bg-gradient-to-r from-pink-500/10 to-purple-500/10 border-pink-500/30 text-pink-600 dark:text-pink-400 hover:bg-pink-500/20"
-        >
-          <Download className="size-3.5" />
-          <span>Tải App</span>
-        </Button>
+        {/* Nút Cài đặt App PWA: CHỈ hiển thị nếu chưa cài đặt để không làm phiền người dùng */}
+        {!isInstalled && !isStandalone && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onOpenInstallModal}
+            className="h-8 px-2.5 text-xs font-bold gap-1 rounded-xl bg-gradient-to-r from-pink-500/10 to-purple-500/10 border-pink-500/30 text-pink-600 dark:text-pink-400 hover:bg-pink-500/20"
+          >
+            <Download className="size-3.5" />
+            <span>Tải App</span>
+          </Button>
+        )}
 
         {user && (
           <UserAvatar

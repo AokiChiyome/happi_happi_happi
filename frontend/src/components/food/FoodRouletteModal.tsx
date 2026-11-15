@@ -7,8 +7,10 @@ import {
 import { useChatStore } from "@/stores/useChatStore";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Dices, RotateCcw, MapPin, Send, ArrowRight, Camera } from "lucide-react";
+import { Sparkles, Dices, RotateCcw, MapPin, Send, ArrowRight, Camera, Bookmark } from "lucide-react";
 import { usePostStore } from "@/stores/usePostStore";
+import { useBookmarkStore } from "@/stores/useBookmarkStore";
+import { triggerHaptic } from "@/utils/haptics";
 import { toast } from "sonner";
 
 // Web Audio API Sound Generator
@@ -28,6 +30,7 @@ class SoundFX {
 
   playTick() {
     try {
+      triggerHaptic("selection");
       this.init();
       if (!this.ctx) return;
       const osc = this.ctx.createOscillator();
@@ -46,6 +49,7 @@ class SoundFX {
 
   playWin() {
     try {
+      triggerHaptic("success");
       this.init();
       if (!this.ctx) return;
       const notes = [523.25, 659.25, 783.99, 1046.5];
@@ -78,6 +82,8 @@ export const FoodRouletteModal: React.FC = () => {
     activeConversationId,
     setCurrentTab,
   } = useChatStore();
+
+  const { addBookmark } = useBookmarkStore();
 
   const [stage, setStage] = useState<1 | 2>(1); // 1: Category, 2: Dish
   const [selectedCategory, setSelectedCategory] = useState<string>("");
@@ -346,6 +352,23 @@ export const FoodRouletteModal: React.FC = () => {
                   <Send className="size-4" /> Gửi Vào Chat Này 💌
                 </Button>
               )}
+              <Button
+                variant="outline"
+                onClick={() => {
+                  addBookmark({
+                    type: "dish",
+                    targetId: `dish-${winningDish.name}`,
+                    title: winningDish.name,
+                    content: `Món ăn thuộc thể loại: ${winningDish.category}`,
+                    emoji: winningDish.emoji || "🥘",
+                    metadata: { category: winningDish.category },
+                  });
+                }}
+                className="gap-2 rounded-xl border-amber-300 dark:border-amber-700/60 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold"
+              >
+                <Bookmark className="size-4" /> Lưu Vào Sổ Tay ⭐
+              </Button>
+
               <a
                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
                   winningDish.name + " gần đây"

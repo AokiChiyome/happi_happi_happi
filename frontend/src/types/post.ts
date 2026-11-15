@@ -34,6 +34,8 @@ export interface Post {
   feeling?: string;
   reactions: Reaction[];
   commentsCount: number;
+  isStory?: boolean;
+  expiresAt?: string;
   createdAt: string;
   updatedAt: string;
 }

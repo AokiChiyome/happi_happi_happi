@@ -21,10 +21,16 @@ import {
   X,
   RefreshCw,
   UserCheck,
+  Clock,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import StickerPicker from "../chat/StickerPicker";
 import type { Sticker } from "@/data/stickersData";
 import type { Post } from "@/types/post";
+import { useLightboxStore } from "@/stores/useLightboxStore";
+import { triggerHaptic } from "@/utils/haptics";
 
 const FEELINGS = [
   { label: "🥰 Đang hạnh phúc", value: "🥰 Đang hạnh phúc" },
@@ -72,8 +78,10 @@ const formatRelativeTime = (dateStr: string) => {
 export const CoupleFeedView: React.FC = () => {
   const { user } = useAuthStore();
   const { setFoodRouletteOpen } = useChatStore();
+  const { openLightbox } = useLightboxStore();
   const {
     posts,
+    stories,
     partner,
     hasPartner,
     loading,
@@ -100,6 +108,11 @@ export const CoupleFeedView: React.FC = () => {
   const [selectedFood, setSelectedFood] = useState<FoodDish | null>(null);
   const [showComposerStickers, setShowComposerStickers] = useState(false);
   const [activeCommentStickerPostId, setActiveCommentStickerPostId] = useState<string | null>(null);
+  const [isStoryMode, setIsStoryMode] = useState(false);
+
+  // Story Viewer modal state
+  const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
+  const [storyProgress, setStoryProgress] = useState(0);
 
   // Active expanded comments
   const [openComments, setOpenComments] = useState<Record<string, boolean>>({});
@@ -109,6 +122,27 @@ export const CoupleFeedView: React.FC = () => {
   useEffect(() => {
     fetchFeed();
   }, [fetchFeed]);
+
+  // Story auto-progress timer (5s per story)
+  useEffect(() => {
+    if (activeStoryIndex === null) return;
+    setStoryProgress(0);
+    const interval = setInterval(() => {
+      setStoryProgress((prev) => {
+        if (prev >= 100) {
+          if (stories && activeStoryIndex < stories.length - 1) {
+            setActiveStoryIndex(activeStoryIndex + 1);
+            return 0;
+          } else {
+            setActiveStoryIndex(null);
+            return 0;
+          }
+        }
+        return prev + 2; // 50 ticks * 100ms = 5000ms
+      });
+    }, 100);
+    return () => clearInterval(interval);
+  }, [activeStoryIndex, stories]);
 
   const handleAddImage = () => {
     if (!imageUrl.trim()) return;
@@ -136,15 +170,18 @@ export const CoupleFeedView: React.FC = () => {
           }
         : undefined,
       feeling: selectedFeeling || undefined,
+      isStory: isStoryMode,
     });
 
     if (success) {
+      triggerHaptic("success");
       setContent("");
       setSelectedFeeling("");
       setShowFeelingPicker(false);
       setAttachedImages([]);
       setSelectedFood(null);
       setShowFoodPicker(false);
+      setIsStoryMode(false);
     }
   };
 
@@ -247,6 +284,80 @@ export const CoupleFeedView: React.FC = () => {
             <p className="text-sm text-muted-foreground max-w-md mx-auto">
               Hãy kết bạn với người ấy ở mục <b>"Bạn bè & Người yêu"</b> bên thanh bên trái để cùng nhau chia sẻ bài viết, lưu giữ kỷ niệm và bình luận nhé!
             </p>
+          </div>
+        )}
+
+        {/* ================= 24H COUPLE STORIES CAROUSEL ================= */}
+        {hasPartner && (
+          <div className="bg-card rounded-3xl border border-border/80 shadow-xs p-4 space-y-2">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                <Clock className="size-3.5 text-pink-500" />
+                Khoảnh khắc 24h (Stories)
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                Tự biến mất sau 24h
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3 overflow-x-auto pb-1 pt-1 px-1 scroll-touch no-scrollbar">
+              {/* Add Story Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsStoryMode(true);
+                  const composer = document.querySelector("textarea");
+                  composer?.focus();
+                }}
+                className="flex flex-col items-center gap-1.5 shrink-0 group focus:outline-none"
+              >
+                <div className="relative size-14 sm:size-16 rounded-full p-0.5 border-2 border-dashed border-pink-400 group-hover:border-pink-600 transition-all">
+                  <Avatar className="size-full">
+                    <AvatarImage src={user?.avatarUrl} />
+                    <AvatarFallback className="bg-pink-100 dark:bg-pink-950 text-pink-600 font-bold">
+                      {user?.displayName?.slice(0, 2).toUpperCase() || "ME"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="absolute -bottom-1 -right-1 size-5 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white flex items-center justify-center text-xs font-black shadow-md border-2 border-background">
+                    +
+                  </div>
+                </div>
+                <span className="text-[11px] font-semibold text-muted-foreground group-hover:text-foreground truncate max-w-[68px]">
+                  Tạo tin
+                </span>
+              </button>
+
+              {/* Active Stories */}
+              {stories.length === 0 ? (
+                <div className="flex items-center gap-2 pl-2 text-xs text-muted-foreground italic">
+                  Chưa có khoảnh khắc nào trong 24h qua... Hãy là người đầu tiên chia sẻ nhé! ✨
+                </div>
+              ) : (
+                stories.map((story, idx) => (
+                  <button
+                    key={story._id}
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic("light");
+                      setActiveStoryIndex(idx);
+                    }}
+                    className="flex flex-col items-center gap-1.5 shrink-0 group focus:outline-none"
+                  >
+                    <div className="size-14 sm:size-16 rounded-full p-[2.5px] bg-gradient-to-tr from-amber-400 via-pink-500 to-purple-600 shadow-sm group-hover:scale-105 transition-transform">
+                      <Avatar className="size-full border-2 border-background">
+                        <AvatarImage src={story.authorId?.avatarUrl || (story.images?.[0] || "")} />
+                        <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                          {story.authorId?.displayName?.slice(0, 2).toUpperCase() || "U"}
+                        </AvatarFallback>
+                      </Avatar>
+                    </div>
+                    <span className="text-[11px] font-medium text-foreground truncate max-w-[68px]">
+                      {story.authorId?.displayName || "Story"}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
           </div>
         )}
 
@@ -484,6 +595,19 @@ export const CoupleFeedView: React.FC = () => {
                   <Sparkles className="size-4 text-purple-500" />
                   <span className="hidden sm:inline">Cảm xúc</span>
                 </Button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsStoryMode(!isStoryMode)}
+                  className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full transition-all border ${
+                    isStoryMode
+                      ? "bg-pink-500 text-white border-pink-500 font-bold shadow-xs"
+                      : "text-muted-foreground border-border hover:border-pink-300"
+                  }`}
+                >
+                  <Clock className="size-3.5" />
+                  <span className="hidden sm:inline">{isStoryMode ? "Khoảnh khắc 24h ⏳" : "Đăng Story"}</span>
+                </button>
               </div>
 
               <Button
@@ -491,7 +615,7 @@ export const CoupleFeedView: React.FC = () => {
                 disabled={submitting || (!content.trim() && attachedImages.length === 0 && !selectedFood)}
                 className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-bold rounded-2xl px-5 shadow-sm"
               >
-                {submitting ? "Đang lưu..." : "Đăng bài 💕"}
+                {submitting ? "Đang lưu..." : isStoryMode ? "Đăng Story 24h ⏳" : "Đăng bài 💕"}
               </Button>
             </div>
           </div>
@@ -624,7 +748,8 @@ export const CoupleFeedView: React.FC = () => {
                           <img
                             src={img}
                             alt="post attachment"
-                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                            onClick={() => openLightbox(img, post.content)}
+                            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-zoom-in"
                             loading="lazy"
                           />
                         </div>
@@ -880,6 +1005,143 @@ export const CoupleFeedView: React.FC = () => {
           })}
         </div>
       </div>
+
+      {/* ================= STORY VIEWER MODAL ================= */}
+      {activeStoryIndex !== null && stories[activeStoryIndex] && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 animate-in fade-in duration-200">
+          <div className="relative w-full max-w-sm h-[580px] max-h-[90vh] bg-gradient-to-b from-neutral-900 via-neutral-950 to-black rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between border border-white/10 text-white">
+            {/* Top Progress Bars */}
+            <div className="p-3 pb-0 space-y-2">
+              <div className="flex gap-1.5 w-full">
+                {stories.map((_, i) => (
+                  <div key={i} className="flex-1 h-1 bg-white/25 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-white transition-all ease-linear"
+                      style={{
+                        width:
+                          i < activeStoryIndex
+                            ? "100%"
+                            : i === activeStoryIndex
+                            ? `${storyProgress}%`
+                            : "0%",
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Story Author Bar */}
+              <div className="flex items-center justify-between pt-1">
+                <div className="flex items-center gap-2">
+                  <Avatar className="size-9 border border-white/20">
+                    <AvatarImage src={stories[activeStoryIndex].authorId?.avatarUrl} />
+                    <AvatarFallback className="bg-pink-500 text-white font-bold text-xs">
+                      {stories[activeStoryIndex].authorId?.displayName?.slice(0, 2).toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h4 className="text-xs font-bold leading-tight">
+                      {stories[activeStoryIndex].authorId?.displayName}
+                    </h4>
+                    <p className="text-[10px] text-white/70 flex items-center gap-1">
+                      <Clock className="size-2.5 text-pink-400" />
+                      {formatRelativeTime(stories[activeStoryIndex].createdAt)}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveStoryIndex(null)}
+                  className="size-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-colors"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Main Story Content Area */}
+            <div className="relative flex-1 flex items-center justify-center px-4 py-2 overflow-hidden">
+              {/* Left / Right tap zones */}
+              <button
+                type="button"
+                aria-label="Previous story"
+                onClick={() => {
+                  if (activeStoryIndex > 0) setActiveStoryIndex(activeStoryIndex - 1);
+                }}
+                className="absolute left-0 inset-y-0 w-1/4 z-10 opacity-0 hover:opacity-100 flex items-center justify-start pl-2"
+              >
+                <ChevronLeft className="size-6 text-white/50" />
+              </button>
+              <button
+                type="button"
+                aria-label="Next story"
+                onClick={() => {
+                  if (activeStoryIndex < stories.length - 1) {
+                    setActiveStoryIndex(activeStoryIndex + 1);
+                  } else {
+                    setActiveStoryIndex(null);
+                  }
+                }}
+                className="absolute right-0 inset-y-0 w-1/4 z-10 opacity-0 hover:opacity-100 flex items-center justify-end pr-2"
+              >
+                <ChevronRight className="size-6 text-white/50" />
+              </button>
+
+              {stories[activeStoryIndex].images && stories[activeStoryIndex].images.length > 0 ? (
+                <div className="relative w-full h-full flex items-center justify-center">
+                  <img
+                    src={stories[activeStoryIndex].images[0]}
+                    alt="story"
+                    className="max-h-full max-w-full object-contain rounded-2xl shadow-lg"
+                  />
+                  {stories[activeStoryIndex].content && (
+                    <div className="absolute bottom-2 inset-x-2 bg-black/60 backdrop-blur-md p-3 rounded-xl text-center">
+                      <p className="text-xs sm:text-sm font-medium text-white">
+                        {stories[activeStoryIndex].content}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-6 text-center space-y-4 max-w-xs">
+                  {stories[activeStoryIndex].feeling && (
+                    <span className="text-xs px-3 py-1 rounded-full bg-white/20 text-white font-semibold">
+                      {stories[activeStoryIndex].feeling}
+                    </span>
+                  )}
+                  {stories[activeStoryIndex].foodDish && (
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold">
+                      <span>{stories[activeStoryIndex].foodDish?.emoji}</span>
+                      <span>{stories[activeStoryIndex].foodDish?.name}</span>
+                    </div>
+                  )}
+                  <p className="text-lg font-bold leading-relaxed text-white">
+                    {stories[activeStoryIndex].content}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Reactions Bar */}
+            <div className="p-3 bg-black/40 border-t border-white/10 flex items-center justify-around">
+              {REACTION_TYPES.map((r) => (
+                <button
+                  key={r.type}
+                  type="button"
+                  onClick={() => {
+                    toggleReaction(stories[activeStoryIndex]._id, r.type);
+                  }}
+                  className="p-2 rounded-full hover:bg-white/15 transition-transform hover:scale-125 text-xl"
+                  title={r.label}
+                >
+                  {r.emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

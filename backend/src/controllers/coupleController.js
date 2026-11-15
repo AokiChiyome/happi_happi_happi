@@ -345,6 +345,24 @@ export const streamMessages = (req, res) => {
     } catch (e) {}
   };
 
+  const onMessagePinned = (data) => {
+    try {
+      if (data.participantIds?.includes(userId)) {
+        res.write(`data: ${JSON.stringify({ type: "message_pinned", ...data })}\n\n`);
+        res.flush?.();
+      }
+    } catch (e) {}
+  };
+
+  const onMessageUnpinned = (data) => {
+    try {
+      if (data.participantIds?.includes(userId)) {
+        res.write(`data: ${JSON.stringify({ type: "message_unpinned", ...data })}\n\n`);
+        res.flush?.();
+      }
+    } catch (e) {}
+  };
+
   chatEmitter.on("new_message", onMessage);
   chatEmitter.on("typing", onTyping);
   chatEmitter.on("message_seen", onMessageSeen);
@@ -356,6 +374,8 @@ export const streamMessages = (req, res) => {
   chatEmitter.on("delete_post", onDeletePost);
   chatEmitter.on("message_reaction", onMessageReaction);
   chatEmitter.on("message_recalled", onMessageRecalled);
+  chatEmitter.on("message_pinned", onMessagePinned);
+  chatEmitter.on("message_unpinned", onMessageUnpinned);
 
   // Heartbeat định kỳ 15s để không bị ngắt kết nối
   const interval = setInterval(() => {
@@ -378,5 +398,7 @@ export const streamMessages = (req, res) => {
     chatEmitter.off("delete_post", onDeletePost);
     chatEmitter.off("message_reaction", onMessageReaction);
     chatEmitter.off("message_recalled", onMessageRecalled);
+    chatEmitter.off("message_pinned", onMessagePinned);
+    chatEmitter.off("message_unpinned", onMessageUnpinned);
   });
 };

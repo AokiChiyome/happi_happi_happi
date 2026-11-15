@@ -289,6 +289,140 @@ export const useChatStore = create<ChatState>()(
         await get().sendMessage(altText || "[Nhãn dán]", recipientId, stickerUrl);
       },
 
+      sendVoiceMessage: async (
+        audioURL: string,
+        duration: number,
+        recipientId?: string
+      ) => {
+        const { activeConversationId, conversations } = get();
+        if (!activeConversationId && !recipientId) return;
+
+        const activeConvo = conversations.find(
+          (c) => c._id === activeConversationId
+        );
+        const currentUser = useAuthStore.getState().user;
+        const targetConvoId = activeConversationId || "";
+        const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        const nowIso = new Date().toISOString();
+
+        if (targetConvoId) {
+          const optimisticMsg: Message = {
+            _id: tempId,
+            conversationId: targetConvoId,
+            senderId: currentUser?._id || "me",
+            content: "[Tin nhắn thoại]",
+            audioURL,
+            audioDuration: duration,
+            createdAt: nowIso,
+            sender: {
+              _id: currentUser?._id || "me",
+              displayName: currentUser?.displayName || "Tôi",
+              avatarUrl: currentUser?.avatarUrl,
+            },
+          };
+
+          set((state) => {
+            const prevItems = state.messages[targetConvoId]?.items || [];
+            return {
+              messages: {
+                ...state.messages,
+                [targetConvoId]: {
+                  ...state.messages[targetConvoId],
+                  items: [...prevItems, optimisticMsg],
+                },
+              },
+            };
+          });
+        }
+
+        try {
+          const currentUserId = currentUser?._id;
+          let finalRecipientId = recipientId;
+          if (!finalRecipientId && activeConvo?.type === "direct") {
+            const other = activeConvo.participants.find(
+              (p) => p._id !== currentUserId
+            );
+            if (other) finalRecipientId = other._id;
+          }
+
+          let res: { message: Message };
+          if (activeConvo?.type === "group" && activeConversationId) {
+            res = await chatService.sendGroupMessage(
+              activeConversationId,
+              undefined,
+              undefined,
+              undefined,
+              audioURL,
+              duration
+            );
+          } else {
+            res = await chatService.sendDirectMessage(
+              finalRecipientId,
+              undefined,
+              activeConversationId ?? undefined,
+              undefined,
+              undefined,
+              audioURL,
+              duration
+            );
+          }
+
+          if (res?.message) {
+            const msg = res.message;
+            set((state) => {
+              const prevItems = state.messages[targetConvoId]?.items || [];
+              const newItems = prevItems.map((m) =>
+                m._id === tempId ? msg : m
+              );
+              return {
+                messages: {
+                  ...state.messages,
+                  [targetConvoId]: {
+                    ...state.messages[targetConvoId],
+                    items: newItems,
+                  },
+                },
+              };
+            });
+          }
+        } catch (error) {
+          console.error("Lỗi gửi tin nhắn thoại:", error);
+          toast.error("Không thể gửi tin nhắn thoại");
+        }
+      },
+
+      pinMessage: async (conversationId: string, messageId: string) => {
+        try {
+          const res = await chatService.pinMessage(conversationId, messageId);
+          if (res?.pinnedMessage) {
+            set((state) => ({
+              conversations: state.conversations.map((c) =>
+                c._id === conversationId
+                  ? { ...c, pinnedMessage: res.pinnedMessage }
+                  : c
+              ),
+            }));
+            toast.success("📌 Đã ghim tin nhắn lên đầu hội thoại!");
+          }
+        } catch (e: any) {
+          toast.error(e.response?.data?.message || "Không thể ghim tin nhắn");
+        }
+      },
+
+      unpinMessage: async (conversationId: string) => {
+        try {
+          await chatService.unpinMessage(conversationId);
+          set((state) => ({
+            conversations: state.conversations.map((c) =>
+              c._id === conversationId ? { ...c, pinnedMessage: null } : c
+            ),
+          }));
+          toast.info("Đã bỏ ghim tin nhắn");
+        } catch (e) {
+          toast.error("Không thể bỏ ghim");
+        }
+      },
+
       sendFoodCard: async (dish: {
         name: string;
         category: string;
@@ -694,6 +828,26 @@ export const useChatStore = create<ChatState>()(
                     conversations: updatedConvos,
                   };
                 });
+                return;
+              }
+
+              if (payload.type === "message_pinned") {
+                const { conversationId, pinnedMessage } = payload;
+                set((state) => ({
+                  conversations: state.conversations.map((c) =>
+                    c._id === conversationId ? { ...c, pinnedMessage } : c
+                  ),
+                }));
+                return;
+              }
+
+              if (payload.type === "message_unpinned") {
+                const { conversationId } = payload;
+                set((state) => ({
+                  conversations: state.conversations.map((c) =>
+                    c._id === conversationId ? { ...c, pinnedMessage: null } : c
+                  ),
+                }));
                 return;
               }
 

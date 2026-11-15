@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Suspense, lazy } from "react";
 import { useChatStore } from "@/stores/useChatStore";
 import { useAuthStore } from "@/stores/useAuthStore";
 import UserAvatar from "./UserAvatar";
 import StatusBadge from "./StatusBadge";
-import { FoodRouletteModal } from "../food/FoodRouletteModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,10 +18,25 @@ import {
   Undo2,
   X,
   Ban,
+  Mic,
+  Play,
+  Pause,
+  Pin,
+  Trash2,
+  Volume2,
+  Bookmark,
 } from "lucide-react";
 import StickerPicker from "./StickerPicker";
 import type { Sticker } from "@/data/stickersData";
 import type { Message } from "@/types/chat";
+import { toast } from "sonner";
+import { useBookmarkStore } from "@/stores/useBookmarkStore";
+import { useLightboxStore } from "@/stores/useLightboxStore";
+import { triggerHaptic } from "@/utils/haptics";
+
+const FoodRouletteModal = lazy(() =>
+  import("../food/FoodRouletteModal").then((m) => ({ default: m.FoodRouletteModal }))
+);
 
 const QUICK_EMOJIS = ["❤️", "😂", "😮", "😢", "👍", "🔥"];
 
@@ -34,6 +48,9 @@ export const ChatWindowLayout: React.FC = () => {
     messages,
     sendMessage,
     sendSticker,
+    sendVoiceMessage,
+    pinMessage,
+    unpinMessage,
     setFoodRouletteOpen,
     typingStatus,
     sendTyping,
@@ -43,9 +60,27 @@ export const ChatWindowLayout: React.FC = () => {
     recallMessage,
   } = useChatStore();
 
+  const { setOpen: setBookmarkModalOpen, addBookmark } = useBookmarkStore();
+  const { openLightbox } = useLightboxStore();
+
   const [inputContent, setInputContent] = useState("");
   const [showStickerPicker, setShowStickerPicker] = useState(false);
   const [activeReactionPickerId, setActiveReactionPickerId] = useState<string | null>(null);
+
+  // Ghi âm tin nhắn thoại (Voice Note)
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<any>(null);
+
+  // Phát lại âm thanh tin nhắn thoại
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Tìm kiếm tin nhắn nhanh trong hội thoại (Telegram style)
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<any>(null);
@@ -75,6 +110,13 @@ export const ChatWindowLayout: React.FC = () => {
   const chatAvatar =
     activeConvo?.type === "group" ? undefined : otherUser?.avatarUrl || undefined;
 
+  // Lọc tin nhắn khi người dùng tìm kiếm
+  const displayedMessages = searchQuery.trim()
+    ? currentMessages.filter((m) =>
+        m.content?.toLowerCase().includes(searchQuery.toLowerCase().trim())
+      )
+    : currentMessages;
+
   // Tự động cuộn xuống cuối khi có tin nhắn mới hoặc đối phương đang gõ
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -103,6 +145,7 @@ export const ChatWindowLayout: React.FC = () => {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     sendTyping(activeConversationId, false);
 
+    triggerHaptic("success");
     setInputContent("");
     sendMessage(text, otherUser?._id);
   };
@@ -117,7 +160,7 @@ export const ChatWindowLayout: React.FC = () => {
     setShowStickerPicker(false);
   };
 
-  // Cuộn tới tin nhắn được trích dẫn (Reply)
+  // Cuộn tới tin nhắn được trích dẫn (Reply hoặc Pin)
   const scrollToMessage = (messageId?: string) => {
     if (!messageId) return;
     const el = document.getElementById(`msg-${messageId}`);
@@ -127,6 +170,83 @@ export const ChatWindowLayout: React.FC = () => {
       setTimeout(() => {
         el.classList.remove("ring-2", "ring-pink-500", "rounded-2xl");
       }, 1500);
+    }
+  };
+
+  // Bắt đầu ghi âm tin nhắn thoại
+  const startRecording = async () => {
+    try {
+      triggerHaptic("medium");
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingSeconds(0);
+
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error("Lỗi micro:", err);
+      toast.error("Không thể truy cập Microphone. Vui lòng cho phép quyền ghi âm trên trình duyệt nhé!");
+    }
+  };
+
+  // Dừng và gửi tin nhắn thoại
+  const stopAndSendRecording = () => {
+    if (!mediaRecorderRef.current || !isRecording) return;
+    const duration = recordingSeconds;
+
+    mediaRecorderRef.current.onstop = () => {
+      const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64Audio = reader.result as string;
+        sendVoiceMessage(base64Audio, duration, otherUser?._id);
+      };
+      reader.readAsDataURL(audioBlob);
+
+      mediaRecorderRef.current?.stream?.getTracks().forEach((track) => track.stop());
+    };
+
+    mediaRecorderRef.current.stop();
+    setIsRecording(false);
+    clearInterval(recordingTimerRef.current);
+  };
+
+  // Hủy ghi âm
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream?.getTracks().forEach((track) => track.stop());
+    }
+    setIsRecording(false);
+    clearInterval(recordingTimerRef.current);
+    audioChunksRef.current = [];
+  };
+
+  // Phát / Dừng âm thanh tin nhắn thoại
+  const togglePlayAudio = (msgId: string, audioSrc?: string) => {
+    if (!audioSrc) return;
+    if (playingAudioId === msgId) {
+      currentAudioRef.current?.pause();
+      setPlayingAudioId(null);
+    } else {
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+      }
+      const audio = new Audio(audioSrc);
+      currentAudioRef.current = audio;
+      audio.play();
+      setPlayingAudioId(msgId);
+      audio.onended = () => setPlayingAudioId(null);
     }
   };
 
@@ -145,6 +265,13 @@ export const ChatWindowLayout: React.FC = () => {
       if (isMine) map[emoji].reactedByMe = true;
     });
     return Object.entries(map);
+  };
+
+  // Format giây thành 00:00
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
   // Nếu chưa chọn hội thoại, hiển thị màn hình chào mừng
@@ -188,15 +315,17 @@ export const ChatWindowLayout: React.FC = () => {
           </Button>
         </div>
 
-        <FoodRouletteModal />
+        <Suspense fallback={null}>
+          <FoodRouletteModal />
+        </Suspense>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col bg-card rounded-3xl border border-border/60 shadow-lg overflow-hidden">
+    <div className="h-full flex flex-col bg-card rounded-3xl border border-border/60 shadow-lg overflow-hidden relative">
       {/* ================= CHAT HEADER ================= */}
-      <header className="px-6 py-4 border-b border-border/50 bg-background/50 backdrop-blur-sm flex items-center justify-between">
+      <header className="px-4 sm:px-6 py-3 border-b border-border/50 bg-background/50 backdrop-blur-sm flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="relative">
             <UserAvatar
@@ -228,18 +357,39 @@ export const ChatWindowLayout: React.FC = () => {
         </div>
 
         {/* Header Action Tools */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <Button
             size="sm"
             onClick={() => setFoodRouletteOpen(true)}
-            className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-bold rounded-full gap-1.5 shadow-sm text-xs px-3.5 py-1.5"
+            className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-bold rounded-full gap-1.5 shadow-sm text-xs px-3 py-1.5"
           >
             <Dices className="size-3.5" />
-            <span>Hôm Nay Ăn Gì?</span>
+            <span className="hidden sm:inline">Hôm Nay Ăn Gì?</span>
+            <span className="sm:hidden">Ăn gì?</span>
           </Button>
 
-          <Button variant="ghost" size="icon" className="size-8 rounded-full">
-            <Search className="size-4 text-muted-foreground" />
+          {/* Nút Tìm kiếm tin nhắn nhanh */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsSearchOpen(!isSearchOpen)}
+            className={`size-8 rounded-full ${
+              isSearchOpen ? "bg-primary/20 text-primary" : "text-muted-foreground"
+            }`}
+            title="Tìm kiếm tin nhắn"
+          >
+            <Search className="size-4" />
+          </Button>
+
+          {/* Nút Mở Sổ Tay Ẩm Thực & Yêu Thích */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setBookmarkModalOpen(true)}
+            className="size-8 rounded-full text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10"
+            title="Sổ tay ẩm thực & Yêu thích ⭐"
+          >
+            <Bookmark className="size-4" />
           </Button>
           <Button variant="ghost" size="icon" className="size-8 rounded-full">
             <MoreVertical className="size-4 text-muted-foreground" />
@@ -247,21 +397,86 @@ export const ChatWindowLayout: React.FC = () => {
         </div>
       </header>
 
+      {/* ================= THANH TÌM KIẾM TIN NHẮN INLINE (TELEGRAM STYLE) ================= */}
+      {isSearchOpen && (
+        <div className="px-4 py-2 bg-muted/60 border-b border-border/60 flex items-center gap-2 animate-in slide-in-from-top-2 duration-150">
+          <Search className="size-4 text-muted-foreground shrink-0" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Tìm kiếm nội dung tin nhắn..."
+            className="h-8 text-xs bg-background/80 rounded-xl"
+            autoFocus
+          />
+          {searchQuery && (
+            <span className="text-[11px] text-muted-foreground shrink-0 font-medium">
+              {displayedMessages.length} kết quả
+            </span>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              setIsSearchOpen(false);
+              setSearchQuery("");
+            }}
+            className="size-7 rounded-full text-muted-foreground hover:text-foreground shrink-0"
+          >
+            <X className="size-3.5" />
+          </Button>
+        </div>
+      )}
+
+      {/* ================= THANH GHIM TIN NHẮN (PINNED MESSAGE BANNER) ================= */}
+      {activeConvo?.pinnedMessage && (
+        <div className="px-4 py-2 bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-amber-500/10 border-b border-pink-500/20 flex items-center justify-between text-xs animate-in slide-in-from-top-2 duration-150">
+          <div
+            onClick={() => scrollToMessage(activeConvo.pinnedMessage?.messageId)}
+            className="flex items-center gap-2 overflow-hidden cursor-pointer flex-1 mr-2 hover:opacity-90 transition-opacity"
+            title="Bấm để cuộn đến tin nhắn này"
+          >
+            <Pin className="size-3.5 text-pink-500 shrink-0 fill-pink-500" />
+            <div className="truncate">
+              <span className="font-bold text-foreground mr-1.5">
+                {activeConvo.pinnedMessage.senderName || "Tin nhắn ghim"}:
+              </span>
+              <span className="text-muted-foreground">
+                "{activeConvo.pinnedMessage.content}"
+              </span>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => unpinMessage(activeConvo._id)}
+            className="size-6 rounded-full hover:bg-pink-500/20 text-muted-foreground hover:text-pink-600 shrink-0"
+            title="Bỏ ghim tin nhắn"
+          >
+            <X className="size-3.5" />
+          </Button>
+        </div>
+      )}
+
       {/* ================= MESSAGE STREAM ================= */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-muted/10">
-        {currentMessages.length === 0 ? (
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-muted/10 scroll-touch">
+        {displayedMessages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-6 text-muted-foreground">
             <span className="text-4xl mb-2">💬</span>
-            <p className="text-sm font-semibold">Chưa có tin nhắn nào ở đây.</p>
-            <p className="text-xs">Hãy gửi lời chào đầu tiên hoặc rủ nhau đi ăn nào! 🥰</p>
+            <p className="text-sm font-semibold">
+              {searchQuery ? "Không tìm thấy tin nhắn phù hợp" : "Chưa có tin nhắn nào ở đây."}
+            </p>
+            <p className="text-xs">
+              {searchQuery ? "Hãy thử tìm bằng từ khóa khác nhé!" : "Hãy gửi lời chào đầu tiên hoặc rủ nhau đi ăn nào! 🥰"}
+            </p>
           </div>
         ) : (
-          currentMessages.map((msg) => {
+          displayedMessages.map((msg) => {
             const isMine = msg.senderId === user?._id;
             const isFoodCard =
               msg.content && msg.content.includes("🍽️ [Gợi ý món ăn]:");
             const stickerSrc = msg.imgURL || msg.imgUrl;
             const isSticker = Boolean(stickerSrc);
+            const isAudio = Boolean(msg.audioURL);
             const isRecalled = Boolean(msg.isRecalled);
             const groupedReactions = getGroupedReactions(msg.reactions);
 
@@ -280,14 +495,14 @@ export const ChatWindowLayout: React.FC = () => {
                   isMine ? "items-end" : "items-start"
                 }`}
               >
-                {/* THANH CÔNG CỤ HOVER TRÊN TIN NHẮN (REACT, REPLY, THU HỒI) */}
+                {/* THANH CÔNG CỤ HOVER TRÊN TIN NHẮN (REACT, REPLY, GHIM, THU HỒI) */}
                 {!isRecalled && !msg._id.startsWith("temp-") && (
                   <div
                     className={`absolute top-0 -translate-y-1/2 ${
-                      isMine ? "-left-20" : "-right-20"
+                      isMine ? "-left-24" : "-right-24"
                     } hidden group-hover:flex items-center gap-1 bg-background/95 dark:bg-zinc-900/95 border border-border/80 rounded-full px-1.5 py-0.5 shadow-md z-20 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-100`}
                   >
-                    {/* Nút Thả Cảm Xúc (Reaction Picker) */}
+                    {/* Nút Thả Cảm Xúc */}
                     <div className="relative">
                       <button
                         type="button"
@@ -302,7 +517,7 @@ export const ChatWindowLayout: React.FC = () => {
                         <Smile className="size-3.5" />
                       </button>
 
-                      {/* Bảng biểu tượng cảm xúc trôi nổi */}
+                      {/* Bảng emoji thả nhanh */}
                       {activeReactionPickerId === msg._id && (
                         <div
                           className={`absolute bottom-8 ${
@@ -314,6 +529,7 @@ export const ChatWindowLayout: React.FC = () => {
                               key={emoji}
                               type="button"
                               onClick={() => {
+                                triggerHaptic("light");
                                 toggleMessageReaction(msg._id, emoji);
                                 setActiveReactionPickerId(null);
                               }}
@@ -336,7 +552,35 @@ export const ChatWindowLayout: React.FC = () => {
                       <CornerUpLeft className="size-3.5" />
                     </button>
 
-                    {/* Nút Thu hồi tin nhắn (Chỉ người gửi mới có quyền) */}
+                    {/* Nút Ghim tin nhắn (Pin) */}
+                    <button
+                      type="button"
+                      onClick={() => pinMessage(activeConvo._id, msg._id)}
+                      className="size-6 rounded-full hover:bg-muted flex items-center justify-center text-xs text-muted-foreground hover:text-amber-500 transition-colors"
+                      title="Ghim tin nhắn này lên đầu"
+                    >
+                      <Pin className="size-3.5" />
+                    </button>
+
+                    {/* Nút Lưu vào Sổ tay ẩm thực & Yêu thích (Bookmark) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        addBookmark({
+                          type: "message",
+                          targetId: msg._id,
+                          title: `Tin nhắn từ ${msg.sender?.displayName || "Bạn"}`,
+                          content: msg.content || "",
+                          emoji: "⭐",
+                        });
+                      }}
+                      className="size-6 rounded-full hover:bg-amber-500/10 flex items-center justify-center text-xs text-muted-foreground hover:text-amber-500 transition-colors"
+                      title="Lưu vào Sổ tay yêu thích"
+                    >
+                      <Bookmark className="size-3.5" />
+                    </button>
+
+                    {/* Nút Thu hồi tin nhắn */}
                     {isMine && (
                       <button
                         type="button"
@@ -373,8 +617,67 @@ export const ChatWindowLayout: React.FC = () => {
                       {timeStr}
                     </span>
                   </div>
+                ) : isAudio ? (
+                  /* 2. TIN NHẮN THOẠI (VOICE NOTE AUDIO PLAYER - TELEGRAM STYLE) */
+                  <div className="max-w-[78%]">
+                    <div
+                      className={`p-3 rounded-2xl flex items-center gap-3 shadow-sm ${
+                        isMine
+                          ? "bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-br-xs"
+                          : "bg-card text-foreground border border-border/80 rounded-bl-xs"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => togglePlayAudio(msg._id, msg.audioURL || undefined)}
+                        className={`size-10 rounded-full flex items-center justify-center shadow-md transition-transform active:scale-95 ${
+                          isMine
+                            ? "bg-white text-pink-600"
+                            : "bg-pink-500 text-white"
+                        }`}
+                      >
+                        {playingAudioId === msg._id ? (
+                          <Pause className="size-5 fill-current" />
+                        ) : (
+                          <Play className="size-5 fill-current ml-0.5" />
+                        )}
+                      </button>
+
+                      {/* Thanh hiển thị sóng âm / tiến trình */}
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1">
+                          <Volume2 className="size-3.5 opacity-80" />
+                          <span className="text-xs font-bold">
+                            Tin nhắn thoại ({msg.audioDuration ? `${msg.audioDuration}s` : "Ghi âm"})
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-0.5 h-3">
+                          {[3, 7, 12, 6, 14, 9, 5, 11, 4, 8, 13, 6, 10, 4].map((h, i) => (
+                            <span
+                              key={i}
+                              style={{ height: `${h}px` }}
+                              className={`w-1 rounded-full ${
+                                playingAudioId === msg._id
+                                  ? "bg-amber-300 animate-pulse"
+                                  : isMine
+                                  ? "bg-white/60"
+                                  : "bg-pink-500/60"
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <span
+                      className={`text-[10px] text-muted-foreground block px-1 mt-0.5 ${
+                        isMine ? "text-right" : "text-left"
+                      }`}
+                    >
+                      {timeStr}
+                    </span>
+                  </div>
                 ) : isFoodCard ? (
-                  /* 2. THẺ GỢI Ý MÓN ĂN */
+                  /* 3. THẺ GỢI Ý MÓN ĂN */
                   <div className="max-w-md w-full bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/30 border-2 border-amber-300 dark:border-amber-700/60 rounded-3xl p-4 shadow-md text-foreground">
                     <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-1">
                       <span>🍽️</span> Gợi ý món ăn tình yêu
@@ -415,9 +718,8 @@ export const ChatWindowLayout: React.FC = () => {
                     </div>
                   </div>
                 ) : isSticker ? (
-                  /* 3. NHÃN DÁN STICKER */
+                  /* 4. NHÃN DÁN STICKER */
                   <div className="max-w-[78%] flex flex-col my-1 group">
-                    {/* Trích dẫn nếu là tin nhắn Reply */}
                     {msg.replyTo && (
                       <div
                         onClick={() => scrollToMessage(msg.replyTo?.messageId)}
@@ -441,6 +743,7 @@ export const ChatWindowLayout: React.FC = () => {
                       <img
                         src={stickerSrc || ""}
                         alt={msg.content || "Sticker"}
+                        onClick={() => stickerSrc && openLightbox(stickerSrc, "Nhãn dán")}
                         className="size-28 sm:size-36 object-contain hover:scale-115 active:scale-95 transition-transform duration-200 cursor-pointer drop-shadow-md select-none"
                         loading="lazy"
                       />
@@ -467,7 +770,7 @@ export const ChatWindowLayout: React.FC = () => {
                     </span>
                   </div>
                 ) : (
-                  /* 4. BONG BÓNG TIN NHẮN TIÊU CHUẨN */
+                  /* 5. BONG BÓNG TIN NHẮN VĂN BẢN TIÊU CHUẨN */
                   <div className="max-w-[78%]">
                     <div
                       className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words shadow-sm ${
@@ -476,7 +779,6 @@ export const ChatWindowLayout: React.FC = () => {
                           : "bg-card text-foreground border border-border/80 rounded-bl-xs"
                       }`}
                     >
-                      {/* Trích dẫn tin nhắn Reply */}
                       {msg.replyTo && (
                         <div
                           onClick={() => scrollToMessage(msg.replyTo?.messageId)}
@@ -566,8 +868,8 @@ export const ChatWindowLayout: React.FC = () => {
       </div>
 
       {/* ================= CHAT INPUT TOOLBAR ================= */}
-      <footer className="p-4 border-t border-border/50 bg-background/50 backdrop-blur-sm space-y-2 relative">
-        {/* THANH XEM TRƯỚC TIN NHẮN ĐANG TRẢ LỜI (REPLY BANNER) */}
+      <footer className="p-3 sm:p-4 border-t border-border/50 bg-background/50 backdrop-blur-sm space-y-2 relative safe-area-bottom">
+        {/* THANH XEM TRƯỚC TIN NHẮN ĐANG TRẢ LỜI */}
         {replyingToMessage && (
           <div className="px-4 py-2 bg-pink-500/10 dark:bg-pink-950/30 border border-pink-500/20 rounded-2xl flex items-center justify-between text-xs animate-in slide-in-from-bottom-2 duration-150">
             <div className="flex items-center gap-2 overflow-hidden">
@@ -604,69 +906,118 @@ export const ChatWindowLayout: React.FC = () => {
           </div>
         )}
 
-        {/* Quick Emoji Bar */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-base select-none no-scrollbar">
-          {["🍗", "🍲", "🧋", "🍣", "🍕", "💖", "🤤", "🥺", "✨"].map(
-            (emoji) => (
-              <button
-                key={emoji}
+        {/* THANH GHI ÂM TIN NHẮN THOẠI (KHI ĐANG GHI ÂM) */}
+        {isRecording ? (
+          <div className="flex items-center justify-between p-2 px-4 bg-red-500/10 border border-red-500/30 rounded-2xl animate-pulse">
+            <div className="flex items-center gap-2">
+              <span className="size-3 rounded-full bg-red-500 animate-ping" />
+              <span className="text-xs font-bold text-red-600 dark:text-red-400">
+                Đang ghi âm... {formatTime(recordingSeconds)}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
                 type="button"
-                onClick={() => handleEmojiClick(emoji)}
-                className="size-7 rounded-full bg-muted/60 hover:bg-muted flex items-center justify-center transition-transform hover:scale-125"
+                variant="ghost"
+                size="sm"
+                onClick={cancelRecording}
+                className="h-8 text-xs text-muted-foreground hover:text-red-500 gap-1 rounded-xl"
               >
-                {emoji}
-              </button>
-            )
-          )}
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setFoodRouletteOpen(true)}
-            className="h-7 text-xs px-2 gap-1 text-pink-500 hover:text-pink-600 hover:bg-pink-500/10 rounded-full font-bold ml-1"
-          >
-            <Dices className="size-3.5" /> Quay món
-          </Button>
-        </div>
+                <Trash2 className="size-3.5" /> Hủy
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={stopAndSendRecording}
+                className="h-8 text-xs font-bold bg-pink-500 hover:bg-pink-600 text-white rounded-xl gap-1"
+              >
+                <Send className="size-3.5" /> Gửi
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Quick Emoji Bar */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-base select-none no-scrollbar">
+              {["🍗", "🍲", "🧋", "🍣", "🍕", "💖", "🤤", "🥺", "✨"].map(
+                (emoji) => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => handleEmojiClick(emoji)}
+                    className="size-7 rounded-full bg-muted/60 hover:bg-muted flex items-center justify-center transition-transform hover:scale-125"
+                  >
+                    {emoji}
+                  </button>
+                )
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setFoodRouletteOpen(true)}
+                className="h-7 text-xs px-2 gap-1 text-pink-500 hover:text-pink-600 hover:bg-pink-500/10 rounded-full font-bold ml-1"
+              >
+                <Dices className="size-3.5" /> Quay món
+              </Button>
+            </div>
 
-        {/* Input Field */}
-        <form onSubmit={handleSend} className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowStickerPicker(!showStickerPicker)}
-            className={`size-10 rounded-2xl shrink-0 transition-colors ${
-              showStickerPicker
-                ? "bg-pink-500/15 text-pink-600 dark:text-pink-400"
-                : "text-muted-foreground hover:text-pink-500 hover:bg-pink-500/10"
-            }`}
-            title="Bộ sưu tập nhãn dán Sticker"
-          >
-            <Smile className="size-5" />
-          </Button>
+            {/* Input Field & Action Buttons */}
+            <form onSubmit={handleSend} className="flex items-center gap-1.5 sm:gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowStickerPicker(!showStickerPicker)}
+                className={`size-10 rounded-2xl shrink-0 transition-colors ${
+                  showStickerPicker
+                    ? "bg-pink-500/15 text-pink-600 dark:text-pink-400"
+                    : "text-muted-foreground hover:text-pink-500 hover:bg-pink-500/10"
+                }`}
+                title="Bộ sưu tập nhãn dán Sticker"
+              >
+                <Smile className="size-5" />
+              </Button>
 
-          <Input
-            value={inputContent}
-            onChange={handleInputChange}
-            placeholder={
-              replyingToMessage
-                ? `Nhập câu trả lời cho ${replyingToMessage.sender?.displayName || "tin nhắn"}...`
-                : `Nhắn tin cho ${chatTitle}...`
-            }
-            className="flex-1 bg-muted/30 border-border/80 rounded-2xl px-4 py-2 text-sm focus-visible:ring-primary/40"
-          />
-          <Button
-            type="submit"
-            disabled={!inputContent.trim()}
-            className="size-10 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white flex items-center justify-center shadow-md transition-transform hover:scale-105 shrink-0"
-          >
-            <Send className="size-4" />
-          </Button>
-        </form>
+              <Input
+                value={inputContent}
+                onChange={handleInputChange}
+                placeholder={
+                  replyingToMessage
+                    ? `Nhập câu trả lời cho ${replyingToMessage.sender?.displayName || "tin nhắn"}...`
+                    : `Nhắn tin cho ${chatTitle}...`
+                }
+                className="flex-1 bg-muted/30 border-border/80 rounded-2xl px-4 py-2 text-sm focus-visible:ring-primary/40"
+              />
+
+              {/* Nút Ghi Âm Voice Note (Hiện khi ô nhập liệu trống - như Telegram/Messenger) */}
+              {!inputContent.trim() ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={startRecording}
+                  className="size-10 rounded-2xl text-muted-foreground hover:text-pink-600 hover:bg-pink-500/10 shrink-0 transition-transform active:scale-95"
+                  title="Nhấn để ghi âm tin nhắn thoại"
+                >
+                  <Mic className="size-5" />
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  className="size-10 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white flex items-center justify-center shadow-md transition-transform hover:scale-105 shrink-0"
+                >
+                  <Send className="size-4" />
+                </Button>
+              )}
+            </form>
+          </>
+        )}
       </footer>
 
-      <FoodRouletteModal />
+      <Suspense fallback={null}>
+        <FoodRouletteModal />
+      </Suspense>
     </div>
   );
 };

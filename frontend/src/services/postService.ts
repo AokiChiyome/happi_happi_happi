@@ -9,6 +9,7 @@ export interface FeedResponse {
     displayName: string;
     avatarUrl?: string;
   };
+  stories?: Post[];
   posts: Post[];
   message?: string;
 }
@@ -22,6 +23,7 @@ export interface CreatePostData {
     emoji: string;
   };
   feeling?: string;
+  isStory?: boolean;
 }
 
 export const postService = {

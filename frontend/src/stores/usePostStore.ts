@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 interface PostState {
   posts: Post[];
+  stories: Post[];
   partner: {
     _id: string;
     username: string;
@@ -31,6 +32,7 @@ interface PostState {
 
 export const usePostStore = create<PostState>((set, get) => ({
   posts: [],
+  stories: [],
   partner: null,
   hasPartner: false,
   loading: false,
@@ -44,6 +46,7 @@ export const usePostStore = create<PostState>((set, get) => ({
       const res = await postService.fetchFeed();
       set({
         posts: res.posts || [],
+        stories: res.stories || [],
         partner: res.partner || null,
         hasPartner: res.hasPartner,
         loading: false,
@@ -61,11 +64,19 @@ export const usePostStore = create<PostState>((set, get) => ({
       if (res?.post) {
         // Optimistic / direct addition if not already added by SSE
         set((state) => {
-          const exists = state.posts.some((p) => p._id === res.post._id);
-          return {
-            posts: exists ? state.posts : [res.post, ...state.posts],
-            submitting: false,
-          };
+          if (res.post.isStory) {
+            const exists = state.stories.some((s) => s._id === res.post._id);
+            return {
+              stories: exists ? state.stories : [res.post, ...state.stories],
+              submitting: false,
+            };
+          } else {
+            const exists = state.posts.some((p) => p._id === res.post._id);
+            return {
+              posts: exists ? state.posts : [res.post, ...state.posts],
+              submitting: false,
+            };
+          }
         });
         toast.success(res.message || "Đã đăng khoảnh khắc mới! 💕");
         return true;
@@ -171,11 +182,19 @@ export const usePostStore = create<PostState>((set, get) => ({
     if (payload.type === "new_post" && payload.post) {
       const newPost: Post = payload.post;
       set((state) => {
-        const exists = state.posts.some((p) => p._id === newPost._id);
-        if (exists) return state;
-        return {
-          posts: [newPost, ...state.posts],
-        };
+        if (newPost.isStory) {
+          const exists = state.stories.some((s) => s._id === newPost._id);
+          if (exists) return state;
+          return {
+            stories: [newPost, ...state.stories],
+          };
+        } else {
+          const exists = state.posts.some((p) => p._id === newPost._id);
+          if (exists) return state;
+          return {
+            posts: [newPost, ...state.posts],
+          };
+        }
       });
     }
 
@@ -219,6 +238,7 @@ export const usePostStore = create<PostState>((set, get) => ({
       const { postId } = payload;
       set((state) => ({
         posts: state.posts.filter((p) => p._id !== postId),
+        stories: state.stories.filter((s) => s._id !== postId),
       }));
     }
   },

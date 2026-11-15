@@ -14,6 +14,7 @@ import cors from "cors";
 import conversationRoute from "./routes/conversationRoute.js";
 import coupleRoute from "./routes/coupleRoute.js";
 import postRoute from "./routes/postRoute.js";
+import bookmarkRoute from "./routes/bookmarkRoute.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, "../.env") });
@@ -123,6 +124,7 @@ app.use("/api/friends", protectedRoute, friendRoute);
 app.use("/api/messages", protectedRoute, messageRoute);
 app.use("/api/conversations", protectedRoute, conversationRoute);
 app.use("/api/posts", protectedRoute, postRoute);
+app.use("/api/bookmarks", protectedRoute, bookmarkRoute);
 
 // Phục vụ Frontend Static nếu đã build (Production) hoặc trang thông báo thân thiện (Development)
 const distPath = path.join(__dirname, "../../frontend/dist");

@@ -64,6 +64,13 @@ export interface ChatState {
     altText?: string,
     recipientId?: string
   ) => Promise<void>;
+  sendVoiceMessage: (
+    audioURL: string,
+    duration: number,
+    recipientId?: string
+  ) => Promise<void>;
+  pinMessage: (conversationId: string, messageId: string) => Promise<void>;
+  unpinMessage: (conversationId: string) => Promise<void>;
   toggleMessageReaction: (messageId: string, emoji: string) => Promise<void>;
   recallMessage: (messageId: string) => Promise<void>;
   sendFoodCard: (dish: {

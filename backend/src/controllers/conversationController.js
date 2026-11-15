@@ -296,3 +296,101 @@ export const markAsSeen = async (req, res) => {
     return res.status(500).json({ message: "Lỗi hệ thống" });
   }
 };
+
+// GHIM TIN NHẮN QUAN TRỌNG (TELEGRAM-STYLE PINNED MESSAGE)
+export const pinMessage = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const { messageId } = req.body;
+    const userId = req.user._id.toString();
+
+    if (!conversationId || !mongoose.Types.ObjectId.isValid(conversationId)) {
+      return res.status(400).json({ message: "Mã cuộc trò chuyện không hợp lệ" });
+    }
+    if (!messageId || !mongoose.Types.ObjectId.isValid(messageId)) {
+      return res.status(400).json({ message: "Mã tin nhắn không hợp lệ" });
+    }
+
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({ message: "Không tìm thấy cuộc trò chuyện" });
+    }
+
+    const isMember = conversation.participants.some(
+      (p) => p.userId.toString() === userId
+    );
+    if (!isMember) {
+      return res.status(403).json({ message: "Bạn không phải thành viên của cuộc trò chuyện này" });
+    }
+
+    const message = await Message.findById(messageId).populate("senderId", "displayName");
+    if (!message) {
+      return res.status(404).json({ message: "Không tìm thấy tin nhắn cần ghim" });
+    }
+
+    const senderName = message.senderId?.displayName || "Người dùng";
+    const pinnedObj = {
+      messageId: message._id,
+      senderName,
+      content: message.isRecalled ? "Tin nhắn đã được thu hồi" : (decryptText(message.content) || (message.audioURL ? "[Tin nhắn thoại]" : "[Hình ảnh/Nhãn dán]")),
+      pinnedBy: req.user._id,
+      pinnedAt: new Date(),
+    };
+
+    conversation.pinnedMessage = pinnedObj;
+    await conversation.save();
+
+    const participantIds = conversation.participants.map((p) => p.userId.toString());
+    chatEmitter.emit("message_pinned", {
+      conversationId: conversation._id.toString(),
+      pinnedMessage: pinnedObj,
+      participantIds,
+    });
+
+    return res.status(200).json({
+      message: "Đã ghim tin nhắn thành công",
+      pinnedMessage: pinnedObj,
+    });
+  } catch (error) {
+    console.error("Lỗi khi ghim tin nhắn:", error);
+    return res.status(500).json({ message: "Lỗi hệ thống khi ghim tin nhắn" });
+  }
+};
+
+// BỎ GHIM TIN NHẮN
+export const unpinMessage = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.user._id.toString();
+
+    if (!conversationId || !mongoose.Types.ObjectId.isValid(conversationId)) {
+      return res.status(400).json({ message: "Mã cuộc trò chuyện không hợp lệ" });
+    }
+
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({ message: "Không tìm thấy cuộc trò chuyện" });
+    }
+
+    const isMember = conversation.participants.some(
+      (p) => p.userId.toString() === userId
+    );
+    if (!isMember) {
+      return res.status(403).json({ message: "Bạn không phải thành viên" });
+    }
+
+    conversation.pinnedMessage = null;
+    await conversation.save();
+
+    const participantIds = conversation.participants.map((p) => p.userId.toString());
+    chatEmitter.emit("message_unpinned", {
+      conversationId: conversation._id.toString(),
+      participantIds,
+    });
+
+    return res.status(200).json({ message: "Đã bỏ ghim tin nhắn thành công" });
+  } catch (error) {
+    console.error("Lỗi khi bỏ ghim tin nhắn:", error);
+    return res.status(500).json({ message: "Lỗi hệ thống" });
+  }
+};

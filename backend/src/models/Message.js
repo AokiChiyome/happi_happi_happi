@@ -20,6 +20,14 @@ const messageSchema = new mongoose.Schema(
     imgURL: {
       type: String,
     },
+    // Tin nhắn thoại (Voice audio note)
+    audioURL: {
+      type: String,
+    },
+    audioDuration: {
+      type: Number,
+      default: 0,
+    },
     // Trạng thái thu hồi tin nhắn (Unsend / Recall)
     isRecalled: {
       type: Boolean,

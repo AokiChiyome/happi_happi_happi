@@ -30,7 +30,9 @@ export const chatService = {
       senderName?: string;
       content?: string | null;
       imgURL?: string | null;
-    }
+    },
+    audioURL?: string,
+    audioDuration?: number
   ): Promise<{ message: Message }> {
     const res = await api.post("/messages/direct", {
       recipientId,
@@ -38,6 +40,8 @@ export const chatService = {
       conversationId,
       imgURL,
       replyTo,
+      audioURL,
+      audioDuration,
     });
     return res.data;
   },
@@ -51,14 +55,28 @@ export const chatService = {
       senderName?: string;
       content?: string | null;
       imgURL?: string | null;
-    }
+    },
+    audioURL?: string,
+    audioDuration?: number
   ): Promise<{ message: Message }> {
     const res = await api.post("/messages/group", {
       conversationId,
       content,
       imgURL,
       replyTo,
+      audioURL,
+      audioDuration,
     });
+    return res.data;
+  },
+
+  async pinMessage(conversationId: string, messageId: string) {
+    const res = await api.post(`/conversations/${conversationId}/pin`, { messageId });
+    return res.data;
+  },
+
+  async unpinMessage(conversationId: string) {
+    const res = await api.delete(`/conversations/${conversationId}/pin`);
     return res.data;
   },
 

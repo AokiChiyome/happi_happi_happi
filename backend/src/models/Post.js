@@ -71,11 +71,20 @@ const postSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    // Khoảnh khắc 24h (24h Couple Story / Moment - FB & Telegram style)
+    isStory: {
+      type: Boolean,
+      default: false,
+    },
+    expiresAt: {
+      type: Date,
+    },
   },
   { timestamps: true }
 );
 
 // Index phục vụ tải dòng thời gian nhanh chóng theo thứ tự mới nhất
 postSchema.index({ coupleKey: 1, createdAt: -1 });
+postSchema.index({ coupleKey: 1, isStory: 1, expiresAt: 1 });
 
 export default mongoose.model("Post", postSchema);
