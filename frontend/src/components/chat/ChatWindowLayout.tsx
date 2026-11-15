@@ -46,10 +46,6 @@ import { useBookmarkStore } from "@/stores/useBookmarkStore";
 import { useLightboxStore } from "@/stores/useLightboxStore";
 import { triggerHaptic } from "@/utils/haptics";
 
-const FoodRouletteModal = lazy(() =>
-  import("../food/FoodRouletteModal").then((m) => ({ default: m.FoodRouletteModal }))
-);
-
 const QUICK_EMOJIS = ["❤️", "😂", "😮", "😢", "👍", "🔥"];
 
 export const ChatWindowLayout: React.FC = () => {
@@ -332,10 +328,6 @@ export const ChatWindowLayout: React.FC = () => {
             <Sparkles className="size-4" /> Quay Món Ăn Ngay
           </Button>
         </div>
-
-        <Suspense fallback={null}>
-          <FoodRouletteModal />
-        </Suspense>
       </div>
     );
   }
@@ -1133,10 +1125,6 @@ export const ChatWindowLayout: React.FC = () => {
           </>
         )}
       </footer>
-
-      <Suspense fallback={null}>
-        <FoodRouletteModal />
-      </Suspense>
     </div>
   );
 };

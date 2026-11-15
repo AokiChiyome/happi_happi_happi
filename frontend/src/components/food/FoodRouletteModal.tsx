@@ -7,25 +7,36 @@ import {
 import { useChatStore } from "@/stores/useChatStore";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Dices, RotateCcw, MapPin, Send, ArrowRight, Camera, Bookmark } from "lucide-react";
+import {
+  Sparkles,
+  Dices,
+  RotateCcw,
+  MapPin,
+  Send,
+  ArrowRight,
+  Camera,
+  Bookmark,
+} from "lucide-react";
 import { usePostStore } from "@/stores/usePostStore";
 import { useBookmarkStore } from "@/stores/useBookmarkStore";
 import { triggerHaptic } from "@/utils/haptics";
 import { toast } from "sonner";
 
-// Web Audio API Sound Generator
+// Web Audio API Sound Generator cho vòng quay ẩm thực
 class SoundFX {
   private ctx: AudioContext | null = null;
 
   private init() {
-    if (!this.ctx) {
-      const AudioCtx =
-        window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioCtx) this.ctx = new AudioCtx();
-    }
-    if (this.ctx && this.ctx.state === "suspended") {
-      this.ctx.resume();
-    }
+    try {
+      if (!this.ctx) {
+        const AudioCtx =
+          window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) this.ctx = new AudioCtx();
+      }
+      if (this.ctx && this.ctx.state === "suspended") {
+        this.ctx.resume();
+      }
+    } catch (e) {}
   }
 
   playTick() {
@@ -37,9 +48,15 @@ class SoundFX {
       const gain = this.ctx.createGain();
       osc.type = "sine";
       osc.frequency.setValueAtTime(650, this.ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(180, this.ctx.currentTime + 0.035);
-      gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.035);
+      osc.frequency.exponentialRampToValueAtTime(
+        180,
+        this.ctx.currentTime + 0.035
+      );
+      gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        this.ctx.currentTime + 0.035
+      );
       osc.connect(gain);
       gain.connect(this.ctx.destination);
       osc.start();
@@ -57,16 +74,16 @@ class SoundFX {
         const osc = this.ctx!.createOscillator();
         const gain = this.ctx!.createGain();
         osc.type = "triangle";
-        osc.frequency.setValueAtTime(freq, this.ctx!.currentTime + i * 0.1);
-        gain.gain.setValueAtTime(0.15, this.ctx!.currentTime + i * 0.1);
+        osc.frequency.setValueAtTime(freq, this.ctx!.currentTime + i * 0.09);
+        gain.gain.setValueAtTime(0.14, this.ctx!.currentTime + i * 0.09);
         gain.gain.exponentialRampToValueAtTime(
           0.001,
-          this.ctx!.currentTime + i * 0.1 + 0.3
+          this.ctx!.currentTime + i * 0.09 + 0.28
         );
         osc.connect(gain);
         gain.connect(this.ctx!.destination);
-        osc.start(this.ctx!.currentTime + i * 0.1);
-        osc.stop(this.ctx!.currentTime + i * 0.1 + 0.35);
+        osc.start(this.ctx!.currentTime + i * 0.09);
+        osc.stop(this.ctx!.currentTime + i * 0.09 + 0.3);
       });
     } catch (e) {}
   }
@@ -74,29 +91,39 @@ class SoundFX {
 
 const sfx = new SoundFX();
 
+// Cấu hình thông số thanh cuộn CS:GO
+const TARGET_INDEX = 32; // Vị trí thẻ kết quả trúng thưởng
+const TOTAL_TRACK_ITEMS = 65; // Tổng số thẻ được tạo trong dải cuộn
+const CARD_WIDTH = 140; // Chiều rộng mỗi thẻ (px)
+const CARD_GAP = 12; // Khoảng cách giữa các thẻ (gap-3 = 12px)
+const STEP = CARD_WIDTH + CARD_GAP; // 152px mỗi bước thẻ
+
 export const FoodRouletteModal: React.FC = () => {
   const {
     isFoodRouletteOpen,
     setFoodRouletteOpen,
     sendFoodCard,
+    conversations,
     activeConversationId,
+    setActiveConversation,
     setCurrentTab,
   } = useChatStore();
 
   const { addBookmark } = useBookmarkStore();
 
-  const [stage, setStage] = useState<1 | 2>(1); // 1: Category, 2: Dish
+  const [stage, setStage] = useState<1 | 2>(1); // 1: Thể loại, 2: Món ăn
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [isSpinning, setIsSpinning] = useState<boolean>(false);
   const [winningDish, setWinningDish] = useState<FoodDish | null>(null);
 
-  // Track cards for animation
+  // Danh sách các thẻ được render trên thanh cuộn (Đảm bảo 100% không bao giờ undefined)
   const [categoryItems, setCategoryItems] = useState<string[]>([]);
   const [dishItems, setDishItems] = useState<FoodDish[]>([]);
 
+  const containerRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
 
-  // Reset when dialog opens
+  // Tự động khởi tạo lại mỗi khi mở modal
   useEffect(() => {
     if (isFoodRouletteOpen) {
       setStage(1);
@@ -109,8 +136,10 @@ export const FoodRouletteModal: React.FC = () => {
 
   const initCategoryTrack = () => {
     const list: string[] = [];
-    for (let i = 0; i < 4; i++) {
-      list.push(...FOOD_CATEGORIES);
+    for (let i = 0; i < TOTAL_TRACK_ITEMS; i++) {
+      list.push(
+        FOOD_CATEGORIES[i % FOOD_CATEGORIES.length] || "Món Ăn Ngon"
+      );
     }
     setCategoryItems(list);
     if (trackRef.current) {
@@ -119,31 +148,37 @@ export const FoodRouletteModal: React.FC = () => {
     }
   };
 
+  // ================= VÒNG 1: QUAY THỂ LOẠI =================
   const spinCategory = () => {
     if (isSpinning) return;
     setIsSpinning(true);
 
-    const targetIndex = Math.floor(Math.random() * FOOD_CATEGORIES.length);
-    const chosenCat = FOOD_CATEGORIES[targetIndex];
+    const targetCatIndex = Math.floor(Math.random() * FOOD_CATEGORIES.length);
+    const chosenCat = FOOD_CATEGORIES[targetCatIndex];
 
-    const cardWidth = 160;
-    const offset = 40 * cardWidth + targetIndex * cardWidth + cardWidth / 2 - 250;
-
-    // Build repeated array
+    // Tạo danh sách thẻ đầy đủ với chosenCat đặt chính xác tại TARGET_INDEX
     const fullList: string[] = [];
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < TOTAL_TRACK_ITEMS; i++) {
       fullList.push(
         FOOD_CATEGORIES[Math.floor(Math.random() * FOOD_CATEGORIES.length)]
       );
     }
-    fullList[40 + targetIndex] = chosenCat;
+    fullList[TARGET_INDEX] = chosenCat;
     setCategoryItems(fullList);
+
+    // Tính toán độ lệch trục X để đưa thẻ TARGET_INDEX về chính giữa kim chỉ
+    const containerWidth = containerRef.current?.clientWidth || 500;
+    const centerPoint = containerWidth / 2;
+    const cardCenter = TARGET_INDEX * STEP + CARD_WIDTH / 2;
+    // Thêm một chút dao động ngẫu nhiên nhỏ bên trong thẻ (±18px) tạo cảm giác sòng bạc chân thực
+    const jitter = (Math.random() - 0.5) * 36;
+    const offset = cardCenter - centerPoint + jitter;
 
     if (trackRef.current) {
       trackRef.current.style.transition = "none";
       trackRef.current.style.transform = "translateX(0px)";
 
-      // Trigger tick sound loop
+      // Hiệu ứng âm thanh tick giảm tốc
       let lastTick = 0;
       const start = Date.now();
       const interval = setInterval(() => {
@@ -152,7 +187,7 @@ export const FoodRouletteModal: React.FC = () => {
           clearInterval(interval);
           return;
         }
-        if (elapsed - lastTick > Math.min(300, 30 + elapsed * 0.08)) {
+        if (elapsed - lastTick > Math.min(300, 25 + elapsed * 0.075)) {
           sfx.playTick();
           lastTick = elapsed;
         }
@@ -161,7 +196,7 @@ export const FoodRouletteModal: React.FC = () => {
       setTimeout(() => {
         if (trackRef.current) {
           trackRef.current.style.transition =
-            "transform 4.5s cubic-bezier(0.12, 0.8, 0.2, 1)";
+            "transform 4.5s cubic-bezier(0.12, 0.85, 0.2, 1)";
           trackRef.current.style.transform = `translateX(-${offset}px)`;
         }
       }, 50);
@@ -170,7 +205,9 @@ export const FoodRouletteModal: React.FC = () => {
         setIsSpinning(false);
         setSelectedCategory(chosenCat);
         sfx.playWin();
-        toast.success(`Đã chọn được: "${chosenCat}"! Tiếp tục mở món ăn nào! 🔥`);
+        toast.success(
+          `Đã chọn: "${chosenCat}"! Chuẩn bị mở hòm món ăn cụ thể nha! 🔥`
+        );
         setTimeout(() => {
           setupDishStage(chosenCat);
         }, 1200);
@@ -178,14 +215,15 @@ export const FoodRouletteModal: React.FC = () => {
     }
   };
 
+  // Chuẩn bị cho Vòng 2
   const setupDishStage = (cat: string) => {
     setStage(2);
     const filtered = ALL_FOOD_DISHES.filter((d) => d.category === cat);
     const available = filtered.length > 0 ? filtered : ALL_FOOD_DISHES;
 
     const initialList: FoodDish[] = [];
-    for (let i = 0; i < 4; i++) {
-      initialList.push(...available);
+    for (let i = 0; i < TOTAL_TRACK_ITEMS; i++) {
+      initialList.push(available[i % available.length]);
     }
     setDishItems(initialList);
 
@@ -195,6 +233,7 @@ export const FoodRouletteModal: React.FC = () => {
     }
   };
 
+  // ================= VÒNG 2: QUAY MÓN ĂN CỤ THỂ =================
   const spinDish = () => {
     if (isSpinning) return;
     setIsSpinning(true);
@@ -206,15 +245,19 @@ export const FoodRouletteModal: React.FC = () => {
     const targetIdx = Math.floor(Math.random() * available.length);
     const chosenDish = available[targetIdx];
 
-    const cardWidth = 160;
-    const offset = 40 * cardWidth + targetIdx * cardWidth + cardWidth / 2 - 250;
-
+    // Tạo danh sách thẻ đầy đủ với chosenDish đặt chính xác tại TARGET_INDEX (không bao giờ vượt mảng)
     const fullList: FoodDish[] = [];
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < TOTAL_TRACK_ITEMS; i++) {
       fullList.push(available[Math.floor(Math.random() * available.length)]);
     }
-    fullList[40 + targetIdx] = chosenDish;
+    fullList[TARGET_INDEX] = chosenDish;
     setDishItems(fullList);
+
+    const containerWidth = containerRef.current?.clientWidth || 500;
+    const centerPoint = containerWidth / 2;
+    const cardCenter = TARGET_INDEX * STEP + CARD_WIDTH / 2;
+    const jitter = (Math.random() - 0.5) * 36;
+    const offset = cardCenter - centerPoint + jitter;
 
     if (trackRef.current) {
       trackRef.current.style.transition = "none";
@@ -228,7 +271,7 @@ export const FoodRouletteModal: React.FC = () => {
           clearInterval(interval);
           return;
         }
-        if (elapsed - lastTick > Math.min(320, 30 + elapsed * 0.08)) {
+        if (elapsed - lastTick > Math.min(320, 25 + elapsed * 0.08)) {
           sfx.playTick();
           lastTick = elapsed;
         }
@@ -237,7 +280,7 @@ export const FoodRouletteModal: React.FC = () => {
       setTimeout(() => {
         if (trackRef.current) {
           trackRef.current.style.transition =
-            "transform 4.6s cubic-bezier(0.12, 0.8, 0.2, 1)";
+            "transform 4.6s cubic-bezier(0.12, 0.85, 0.2, 1)";
           trackRef.current.style.transform = `translateX(-${offset}px)`;
         }
       }, 50);
@@ -250,22 +293,32 @@ export const FoodRouletteModal: React.FC = () => {
     }
   };
 
+  // Chia sẻ vào cuộc trò chuyện
   const handleSendToChat = () => {
     if (!winningDish) return;
-    if (!activeConversationId) {
-      toast.info("Bạn chưa chọn cuộc trò chuyện nào để gửi món ăn!");
+    const targetConvoId = activeConversationId || conversations[0]?._id;
+    if (!targetConvoId) {
+      toast.info("Chưa có cuộc trò chuyện nào để gửi món ăn!");
       setFoodRouletteOpen(false);
       return;
     }
+
+    if (!activeConversationId) {
+      setActiveConversation(targetConvoId);
+    }
+
     sendFoodCard({
       name: winningDish.name,
       category: winningDish.category,
       emoji: winningDish.emoji,
       note: "Món ăn định mệnh hôm nay đây rồi! Cùng đi ăn nha! 🥰",
     });
+    toast.success(`Đã gửi gợi ý "${winningDish.name}" vào đoạn chat! 💕`);
     setFoodRouletteOpen(false);
+    setCurrentTab("chat");
   };
 
+  // Đăng lên Bảng tin Cặp Đôi
   const handlePostToFeed = async () => {
     if (!winningDish) return;
     const ok = await usePostStore.getState().createPost({
@@ -278,6 +331,7 @@ export const FoodRouletteModal: React.FC = () => {
       feeling: "🤤 Đang thèm ăn",
     });
     if (ok) {
+      toast.success("Đã đăng gợi ý món ăn lên Bảng tin Cặp đôi! 💕");
       setFoodRouletteOpen(false);
       setCurrentTab("feed");
     }
@@ -285,73 +339,87 @@ export const FoodRouletteModal: React.FC = () => {
 
   return (
     <Dialog open={isFoodRouletteOpen} onOpenChange={setFoodRouletteOpen}>
-      <DialogContent className="max-w-2xl bg-card border-border shadow-2xl p-6 rounded-3xl">
-        <DialogTitle className="text-xl font-extrabold flex items-center justify-between">
+      <DialogContent className="max-w-xl w-[94vw] sm:w-full bg-card/95 backdrop-blur-xl border-border shadow-2xl p-4 sm:p-6 rounded-3xl max-h-[92vh] overflow-y-auto">
+        <DialogTitle className="text-lg sm:text-xl font-black flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="text-2xl">🍱</span>
-            <span>Hôm Nay Em Muốn Ăn Gì?</span>
+            <span className="bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
+              Hôm Nay Em Muốn Ăn Gì?
+            </span>
           </div>
-          <span className="text-xs font-semibold px-3 py-1 bg-primary/10 text-primary rounded-full">
-            {stage === 1 ? "Vòng 1: Chọn Thể Loại" : `Vòng 2: Món ${selectedCategory}`}
+          <span className="text-[11px] sm:text-xs font-bold px-2.5 py-0.5 bg-pink-500/10 text-pink-600 dark:text-pink-400 rounded-full">
+            {stage === 1
+              ? "Vòng 1: Chọn Thể Loại"
+              : `Vòng 2: Món ${selectedCategory || "Ngon"}`}
           </span>
         </DialogTitle>
 
-        {/* Stepper info */}
-        <div className="flex items-center justify-center gap-3 py-2 text-sm font-semibold">
+        {/* Thanh tiến trình Stepper */}
+        <div className="flex items-center justify-center gap-2 sm:gap-3 py-1 text-xs font-bold select-none">
           <div
-            className={`px-4 py-1.5 rounded-full flex items-center gap-2 ${
-              stage === 1 ? "bg-primary text-white" : "bg-muted text-muted-foreground"
+            className={`px-3 py-1 rounded-full flex items-center gap-1.5 transition-colors ${
+              stage === 1
+                ? "bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-xs"
+                : "bg-muted text-muted-foreground"
             }`}
           >
-            <span>1</span> <span>Thể Loại</span>
+            <span className="size-4 rounded-full bg-white/20 flex items-center justify-center text-[10px]">
+              1
+            </span>
+            <span>Thể Loại</span>
           </div>
-          <ArrowRight className="size-4 text-muted-foreground" />
+          <ArrowRight className="size-3.5 text-muted-foreground" />
           <div
-            className={`px-4 py-1.5 rounded-full flex items-center gap-2 ${
-              stage === 2 ? "bg-primary text-white" : "bg-muted text-muted-foreground"
+            className={`px-3 py-1 rounded-full flex items-center gap-1.5 transition-colors ${
+              stage === 2
+                ? "bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-xs"
+                : "bg-muted text-muted-foreground"
             }`}
           >
-            <span>2</span> <span>Món Cụ Thể</span>
+            <span className="size-4 rounded-full bg-white/20 flex items-center justify-center text-[10px]">
+              2
+            </span>
+            <span>Món Cụ Thể</span>
           </div>
         </div>
 
-        {/* ================= RESULT CELEBRATION ================= */}
+        {/* ================= MÀN HÌNH KẾT QUẢ TRÚNG MÓN ĂN ================= */}
         {winningDish ? (
-          <div className="py-6 px-4 text-center space-y-4 animate-in fade-in zoom-in-95 duration-300">
-            <div className="size-24 mx-auto rounded-3xl bg-amber-100 dark:bg-amber-950/40 border-2 border-amber-300 flex items-center justify-center text-5xl shadow-lg">
-              {winningDish.emoji}
+          <div className="py-4 px-2 text-center space-y-3.5 animate-in fade-in zoom-in-95 duration-250">
+            <div className="size-20 sm:size-24 mx-auto rounded-3xl bg-amber-100 dark:bg-amber-950/40 border-2 border-amber-300 dark:border-amber-700/60 flex items-center justify-center text-4xl sm:text-5xl shadow-lg animate-bounce duration-1000">
+              {winningDish.emoji || "🥘"}
             </div>
             <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-primary px-3 py-1 bg-primary/10 rounded-full">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-pink-600 dark:text-pink-400 px-3 py-1 bg-pink-500/10 rounded-full">
                 {winningDish.category}
               </span>
-              <h2 className="text-2xl font-black mt-2 text-foreground">
+              <h2 className="text-xl sm:text-2xl font-black mt-2 text-foreground">
                 {winningDish.name}
               </h2>
-              <p className="text-sm text-muted-foreground max-w-md mx-auto mt-1">
-                {winningDish.description}
+              <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto mt-1 leading-relaxed">
+                {winningDish.description || "Món ăn thơm ngon tuyệt hảo cho ngày hẹn hò ngọt ngào."}
               </p>
             </div>
 
-            <div className="p-3 bg-muted/40 rounded-2xl border text-xs text-muted-foreground italic">
+            <div className="p-2.5 bg-muted/40 rounded-2xl border border-border/60 text-xs text-muted-foreground italic">
               "Kèo này chốt hạ! Không được bảo ăn gì cũng được nữa nhé!" 💌
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+              <Button
+                onClick={handleSendToChat}
+                className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-bold gap-1.5 rounded-xl shadow-xs text-xs h-9 px-3.5"
+              >
+                <Send className="size-3.5" /> Gửi Vào Chat Này 💌
+              </Button>
+
               <Button
                 onClick={handlePostToFeed}
-                className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-bold gap-2 rounded-xl shadow-xs"
+                className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-bold gap-1.5 rounded-xl shadow-xs text-xs h-9 px-3.5"
               >
-                <Camera className="size-4" /> Đăng Lên Bảng Tin Cặp Đôi 💕
+                <Camera className="size-3.5" /> Đăng Lên Bảng Tin 💕
               </Button>
-              {activeConversationId && (
-                <Button
-                  onClick={handleSendToChat}
-                  className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-bold gap-2 rounded-xl shadow-xs"
-                >
-                  <Send className="size-4" /> Gửi Vào Chat Này 💌
-                </Button>
-              )}
+
               <Button
                 variant="outline"
                 onClick={() => {
@@ -364,9 +432,9 @@ export const FoodRouletteModal: React.FC = () => {
                     metadata: { category: winningDish.category },
                   });
                 }}
-                className="gap-2 rounded-xl border-amber-300 dark:border-amber-700/60 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold"
+                className="gap-1.5 rounded-xl border-amber-300 dark:border-amber-700/60 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold text-xs h-9 px-3"
               >
-                <Bookmark className="size-4" /> Lưu Vào Sổ Tay ⭐
+                <Bookmark className="size-3.5" /> Lưu Vào Sổ Tay ⭐
               </Button>
 
               <a
@@ -376,10 +444,11 @@ export const FoodRouletteModal: React.FC = () => {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <Button variant="outline" className="gap-2 rounded-xl">
-                  <MapPin className="size-4 text-emerald-500" /> Tìm Quán Quanh Đây
+                <Button variant="outline" className="gap-1.5 rounded-xl text-xs h-9 px-3">
+                  <MapPin className="size-3.5 text-emerald-500" /> Tìm Quán Quanh Đây
                 </Button>
               </a>
+
               <Button
                 variant="ghost"
                 onClick={() => {
@@ -387,35 +456,40 @@ export const FoodRouletteModal: React.FC = () => {
                   setStage(1);
                   initCategoryTrack();
                 }}
-                className="gap-2 rounded-xl"
+                className="gap-1.5 rounded-xl text-xs h-9 px-3 text-muted-foreground hover:text-foreground"
               >
-                <RotateCcw className="size-4" /> Quay Lại Từ Đầu
+                <RotateCcw className="size-3.5" /> Quay Lại Từ Đầu
               </Button>
             </div>
           </div>
         ) : (
-          /* ================= ROULETTE TRACK ================= */
-          <div className="space-y-6 py-4">
-            <div className="relative w-full h-[180px] bg-slate-900 rounded-2xl overflow-hidden border-4 border-primary/20 shadow-inner flex items-center">
-              {/* CS:GO Pointer Marker Top */}
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center">
-                <div className="w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[14px] border-t-pink-500 drop-shadow"></div>
-                <div className="w-[3px] h-32 bg-pink-500/80 shadow-[0_0_8px_#ff5e8e]"></div>
+          /* ================= KHUNG THANH CUỘN CS:GO ROULETTE ================= */
+          <div className="space-y-4 py-2">
+            <div
+              ref={containerRef}
+              className="relative w-full h-[155px] sm:h-[165px] bg-slate-900 rounded-2xl overflow-hidden border-2 sm:border-3 border-pink-500/30 shadow-inner flex items-center"
+            >
+              {/* Kim chỉ định vị trung tâm CS:GO (Đúng 50% tâm điểm khung nhìn) */}
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center pointer-events-none">
+                <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[12px] border-t-pink-500 drop-shadow-[0_2px_4px_rgba(244,63,94,0.8)]"></div>
+                <div className="w-[2px] h-28 bg-gradient-to-b from-pink-500 via-rose-400 to-transparent shadow-[0_0_8px_#f43f5e]"></div>
               </div>
 
-              {/* Moving Track */}
+              {/* Dải thẻ di chuyển mượt mà */}
               <div
                 ref={trackRef}
-                className="flex items-center gap-3 pl-[180px] select-none will-change-transform"
+                className="flex items-center gap-3 select-none will-change-transform"
+                style={{ paddingLeft: 0 }}
               >
                 {stage === 1
                   ? categoryItems.map((cat, idx) => (
                       <div
                         key={idx}
-                        className="w-[150px] h-[140px] flex-shrink-0 bg-slate-800 border-2 border-slate-700/80 rounded-2xl flex flex-col items-center justify-center p-3 text-center shadow-lg transition-transform"
+                        style={{ width: `${CARD_WIDTH}px` }}
+                        className="h-[125px] sm:h-[135px] flex-shrink-0 bg-slate-800/90 border border-slate-700/80 rounded-2xl flex flex-col items-center justify-center p-2.5 text-center shadow-md select-none"
                       >
-                        <span className="text-3xl mb-2">🍽️</span>
-                        <span className="text-sm font-bold text-slate-100 line-clamp-2">
+                        <span className="text-2xl sm:text-3xl mb-1.5">🍽️</span>
+                        <span className="text-xs sm:text-sm font-bold text-slate-100 line-clamp-2 px-1">
                           {cat}
                         </span>
                       </div>
@@ -423,42 +497,47 @@ export const FoodRouletteModal: React.FC = () => {
                   : dishItems.map((dish, idx) => (
                       <div
                         key={idx}
-                        className="w-[150px] h-[140px] flex-shrink-0 bg-slate-800 border-2 border-slate-700/80 rounded-2xl flex flex-col items-center justify-center p-3 text-center shadow-lg"
+                        style={{ width: `${CARD_WIDTH}px` }}
+                        className="h-[125px] sm:h-[135px] flex-shrink-0 bg-slate-800/90 border border-slate-700/80 rounded-2xl flex flex-col items-center justify-center p-2.5 text-center shadow-md select-none"
                       >
-                        <span className="text-3xl mb-1">{dish.emoji || "🥘"}</span>
-                        <span className="text-xs font-bold text-slate-100 line-clamp-2">
-                          {dish.name}
+                        <span className="text-2xl sm:text-3xl mb-1">
+                          {dish?.emoji || "🥘"}
                         </span>
-                        <span className="text-[10px] text-pink-400 mt-1 font-semibold truncate max-w-full">
-                          {dish.tag || dish.category}
+                        <span className="text-[11px] sm:text-xs font-bold text-slate-100 line-clamp-2 px-1 leading-tight">
+                          {dish?.name || "Món Ngon"}
+                        </span>
+                        <span className="text-[9px] sm:text-[10px] text-pink-400 mt-1 font-semibold truncate max-w-full px-1">
+                          {dish?.tag || dish?.category || "Hấp dẫn"}
                         </span>
                       </div>
                     ))}
               </div>
             </div>
 
-            {/* Actions Bar */}
-            <div className="flex items-center justify-center gap-4">
+            {/* Thanh điều khiển nút Quay */}
+            <div className="flex items-center justify-center gap-3 pt-1">
               {stage === 1 ? (
                 <Button
                   size="lg"
                   disabled={isSpinning}
                   onClick={spinCategory}
-                  className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-extrabold text-base px-8 py-6 rounded-2xl shadow-lg gap-2"
+                  className="bg-gradient-to-r from-pink-500 via-purple-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-extrabold text-sm sm:text-base px-6 sm:px-8 py-5 sm:py-6 rounded-2xl shadow-lg gap-2 active:scale-95 transition-transform"
                 >
-                  <Dices className="size-5" />
-                  {isSpinning ? "Đang mở hòm..." : "Quay Thể Loại Ngay!"}
+                  <Dices className="size-4 sm:size-5" />
+                  {isSpinning ? "Đang mở hòm..." : "🎲 Quay Thể Loại Ngay!"}
                 </Button>
               ) : (
-                <>
+                <div className="flex items-center gap-2">
                   <Button
                     size="lg"
                     disabled={isSpinning}
                     onClick={spinDish}
-                    className="bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-extrabold text-base px-8 py-6 rounded-2xl shadow-lg gap-2"
+                    className="bg-gradient-to-r from-amber-500 via-pink-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-extrabold text-sm sm:text-base px-5 sm:px-7 py-5 sm:py-6 rounded-2xl shadow-lg gap-2 active:scale-95 transition-transform"
                   >
-                    <Sparkles className="size-5" />
-                    {isSpinning ? "Đang chọn món..." : `Mở Hòm Món ${selectedCategory}!`}
+                    <Sparkles className="size-4 sm:size-5" />
+                    {isSpinning
+                      ? "Đang chọn món..."
+                      : `Mở Món ${selectedCategory || "Ngon"}!`}
                   </Button>
                   <Button
                     variant="outline"
@@ -467,11 +546,11 @@ export const FoodRouletteModal: React.FC = () => {
                       setStage(1);
                       initCategoryTrack();
                     }}
-                    className="rounded-xl"
+                    className="rounded-2xl h-11 text-xs"
                   >
                     Đổi Thể Loại
                   </Button>
-                </>
+                </div>
               )}
             </div>
           </div>

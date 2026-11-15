@@ -12,6 +12,7 @@ const FloatingChatHead = lazy(() => import("@/components/chat/FloatingChatHead")
 const InstallAppModal = lazy(() => import("@/components/pwa/InstallAppModal"));
 const BookmarksModal = lazy(() => import("@/components/bookmarks/BookmarksModal"));
 const LightboxModal = lazy(() => import("@/components/media/LightboxModal"));
+const FoodRouletteModal = lazy(() => import("@/components/food/FoodRouletteModal"));
 
 export const ChatAppPage = () => {
   const {
@@ -78,6 +79,11 @@ export const ChatAppPage = () => {
       {/* Trình xem ảnh Lightbox mượt mà (Tap-to-Zoom & Fullscreen) */}
       <Suspense fallback={null}>
         <LightboxModal />
+      </Suspense>
+
+      {/* Vòng quay mở hòm ẩm thực CS:GO (Hôm Nay Em Muốn Ăn Gì) */}
+      <Suspense fallback={null}>
+        <FoodRouletteModal />
       </Suspense>
     </SidebarProvider>
   );
