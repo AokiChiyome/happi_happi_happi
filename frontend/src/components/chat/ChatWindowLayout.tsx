@@ -25,7 +25,19 @@ import {
   Trash2,
   Volume2,
   Bookmark,
+  Bell,
+  BellRing,
+  MessageCircle,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import { useNotificationStore } from "@/stores/useNotificationStore";
 import StickerPicker from "./StickerPicker";
 import type { Sticker } from "@/data/stickersData";
 import type { Message } from "@/types/chat";
@@ -62,6 +74,12 @@ export const ChatWindowLayout: React.FC = () => {
 
   const { setOpen: setBookmarkModalOpen, addBookmark } = useBookmarkStore();
   const { openLightbox } = useLightboxStore();
+  const {
+    isChatHeadVisible,
+    toggleChatHead,
+    triggerSampleNotification,
+    requestPermission,
+  } = useNotificationStore();
 
   const [inputContent, setInputContent] = useState("");
   const [showStickerPicker, setShowStickerPicker] = useState(false);
@@ -391,9 +409,97 @@ export const ChatWindowLayout: React.FC = () => {
           >
             <Bookmark className="size-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="size-8 rounded-full">
-            <MoreVertical className="size-4 text-muted-foreground" />
+
+          {/* Nút Bật/Tắt Bong Bóng Chat Nổi (Messenger Chat Head) */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleChatHead}
+            className={`size-8 rounded-full transition-colors ${
+              isChatHeadVisible
+                ? "bg-pink-500/20 text-pink-600 dark:text-pink-400"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            title={
+              isChatHeadVisible
+                ? "Bong bóng chat đang BẬT (Bấm để ẩn)"
+                : "Bật bong bóng chat nổi (Messenger Style)"
+            }
+          >
+            <MessageCircle className="size-4" />
           </Button>
+
+          {/* Menu Tùy Chọn Nâng Cao: Cấp quyền thông báo, Thử bong bóng chat */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="size-8 rounded-full" title="Tùy chọn khác">
+                <MoreVertical className="size-4 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 rounded-2xl p-1.5 shadow-xl border-border/80">
+              <DropdownMenuLabel className="text-xs font-bold text-muted-foreground px-2 py-1">
+                Tiện ích & Thông báo
+              </DropdownMenuLabel>
+
+              <DropdownMenuItem
+                onClick={toggleChatHead}
+                className="cursor-pointer rounded-xl flex items-center justify-between text-xs py-2"
+              >
+                <div className="flex items-center gap-2">
+                  <MessageCircle className="size-4 text-pink-500" />
+                  <span>Bong bóng chat nổi</span>
+                </div>
+                <span
+                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                    isChatHeadVisible
+                      ? "bg-pink-500/20 text-pink-600 dark:text-pink-400"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {isChatHeadVisible ? "Đang bật" : "Tắt"}
+                </span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={async () => {
+                  const granted = await requestPermission();
+                  if (granted) {
+                    toast.success("Đã bật quyền thông báo trình duyệt! 🔔");
+                  } else {
+                    toast.info("Vui lòng cho phép quyền thông báo trong trình duyệt của bạn.");
+                  }
+                }}
+                className="cursor-pointer rounded-xl flex items-center gap-2 text-xs py-2"
+              >
+                <Bell className="size-4 text-purple-500" />
+                <span>Bật thông báo đẩy</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={() => {
+                  triggerSampleNotification(
+                    otherUser?.displayName || "Người Yêu 💕",
+                    "Em nhớ anh quá nè! Tối nay mình đi ăn gì nha? 🥰"
+                  );
+                  toast.success("Đã phát chuông ding và hiện bong bóng chat mẫu! 💕");
+                }}
+                className="cursor-pointer rounded-xl flex items-center gap-2 text-xs py-2 bg-pink-500/10 text-pink-600 dark:text-pink-400 font-semibold"
+              >
+                <BellRing className="size-4 text-pink-500" />
+                <span>Thử thông báo & Bong bóng</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator className="my-1" />
+
+              <DropdownMenuItem
+                onClick={() => setBookmarkModalOpen(true)}
+                className="cursor-pointer rounded-xl flex items-center gap-2 text-xs py-2 text-amber-600 dark:text-amber-400"
+              >
+                <Bookmark className="size-4" />
+                <span>Sổ tay ẩm thực & Yêu thích ⭐</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 

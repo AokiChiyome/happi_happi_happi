@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { notificationSound } from "@/utils/soundHelper";
+import { triggerHaptic } from "@/utils/haptics";
 
 export interface MessageBubble {
   id: string;
@@ -26,16 +27,27 @@ interface NotificationState {
     conversationId: string;
   }) => void;
   dismissBubble: () => void;
+  showChatHead: () => void;
   hideChatHead: () => void;
+  toggleChatHead: () => void;
   setMiniChatOpen: (open: boolean) => void;
   toggleMiniChat: () => void;
   toggleSound: () => void;
+  requestPermission: () => Promise<boolean>;
+  triggerSampleNotification: (sampleSender?: string, sampleContent?: string) => Promise<void>;
 }
+
+// Lưu trạng thái bật/tắt bong bóng chat của người dùng vào localStorage
+const getSavedChatHeadState = (): boolean => {
+  if (typeof window === "undefined") return true;
+  const saved = localStorage.getItem("happi_chat_head_enabled");
+  return saved === null ? true : saved === "true";
+};
 
 export const useNotificationStore = create<NotificationState>((set, get) => ({
   activeBubble: null,
   isBubbleVisible: false,
-  isChatHeadVisible: false,
+  isChatHeadVisible: getSavedChatHeadState(),
   unreadCount: 0,
   isMiniChatOpen: false,
   soundEnabled: true,
@@ -47,6 +59,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     if (soundEnabled) {
       notificationSound.playPop();
     }
+    triggerHaptic("light");
 
     if (bubbleTimeout) {
       clearTimeout(bubbleTimeout);
@@ -61,7 +74,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       timestamp: new Date(),
     };
 
-    // Auto dismiss speech bubble after 6.5s (Chat Head remains visible)
+    // Tự động thu gọn thẻ xem trước sau 6.5s (Bong bóng tròn vẫn tồn tại)
     const timeout = setTimeout(() => {
       set({ isBubbleVisible: false });
     }, 6500);
@@ -74,13 +87,12 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       bubbleTimeout: timeout,
     });
 
-    // Native browser push notification if permitted and tab hidden
+    // Thông báo trình duyệt (Browser Push Notification)
     try {
       if (
         typeof window !== "undefined" &&
         "Notification" in window &&
-        Notification.permission === "granted" &&
-        document.hidden
+        Notification.permission === "granted"
       ) {
         new Notification(data.senderName, {
           body: data.content,
@@ -96,9 +108,19 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     set({ isBubbleVisible: false });
   },
 
+  showChatHead: () => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("happi_chat_head_enabled", "true");
+    }
+    set({ isChatHeadVisible: true });
+  },
+
   hideChatHead: () => {
     const { bubbleTimeout } = get();
     if (bubbleTimeout) clearTimeout(bubbleTimeout);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("happi_chat_head_enabled", "false");
+    }
     set({
       isBubbleVisible: false,
       isChatHeadVisible: false,
@@ -107,7 +129,21 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     });
   },
 
+  toggleChatHead: () => {
+    const nextState = !get().isChatHeadVisible;
+    if (typeof window !== "undefined") {
+      localStorage.setItem("happi_chat_head_enabled", String(nextState));
+    }
+    set({
+      isChatHeadVisible: nextState,
+      isBubbleVisible: nextState ? get().isBubbleVisible : false,
+      isMiniChatOpen: nextState ? get().isMiniChatOpen : false,
+    });
+    triggerHaptic("selection");
+  },
+
   setMiniChatOpen: (open) => {
+    triggerHaptic("selection");
     set({
       isMiniChatOpen: open,
       isBubbleVisible: false,
@@ -116,6 +152,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   toggleMiniChat: () => {
+    triggerHaptic("medium");
     const nextState = !get().isMiniChatOpen;
     set({
       isMiniChatOpen: nextState,
@@ -125,6 +162,50 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   toggleSound: () => {
+    triggerHaptic("selection");
     set((state) => ({ soundEnabled: !state.soundEnabled }));
+  },
+
+  requestPermission: async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      return false;
+    }
+    try {
+      const perm = await Notification.requestPermission();
+      return perm === "granted";
+    } catch (e) {
+      return false;
+    }
+  },
+
+  triggerSampleNotification: async (sampleSender = "Người Ấy 💕", sampleContent = "Em nhớ anh quá nè! Tối nay mình đi ăn gì nha? 🥰") => {
+    // 1. Âm thanh chuông Ding Pop
+    notificationSound.playPop();
+    triggerHaptic("success");
+
+    // 2. Cấp quyền nếu chưa có
+    if (typeof window !== "undefined" && "Notification" in window) {
+      if (Notification.permission === "default") {
+        try {
+          await Notification.requestPermission();
+        } catch (e) {}
+      }
+
+      if (Notification.permission === "granted") {
+        try {
+          new Notification(`Happi 💕 - ${sampleSender}`, {
+            body: sampleContent,
+            icon: "/logo.svg",
+          });
+        } catch (e) {}
+      }
+    }
+
+    // 3. Hiển thị Bong bóng chat trực tiếp trên màn hình
+    get().showBubble({
+      senderName: sampleSender,
+      content: sampleContent,
+      conversationId: "",
+    });
   },
 }));

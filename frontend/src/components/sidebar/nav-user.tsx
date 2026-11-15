@@ -1,7 +1,11 @@
 import {
   ChevronsUpDown,
   LogOut,
+  MessageCircle,
+  Bell,
 } from "lucide-react";
+import { useNotificationStore } from "@/stores/useNotificationStore";
+import { toast } from "sonner";
 
 import {
   Avatar,
@@ -35,6 +39,8 @@ export function NavUser({
 }) {
   const { isMobile } = useSidebar();
   const { signOut } = useAuthStore();
+  const { isChatHeadVisible, toggleChatHead, triggerSampleNotification } =
+    useNotificationStore();
 
   return (
     <SidebarMenu>
@@ -82,6 +88,36 @@ export function NavUser({
                 </div>
               </div>
             </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={toggleChatHead}
+              className="cursor-pointer rounded-xl flex items-center justify-between text-xs py-2"
+            >
+              <div className="flex items-center gap-2">
+                <MessageCircle className="size-4 text-pink-500" />
+                <span>Bong bóng chat nổi</span>
+              </div>
+              <span
+                className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                  isChatHeadVisible
+                    ? "bg-pink-500/20 text-pink-600 dark:text-pink-400"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {isChatHeadVisible ? "Bật" : "Tắt"}
+              </span>
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              onClick={() => {
+                triggerSampleNotification();
+                toast.success("Đã phát thông báo mẫu! 💕");
+              }}
+              className="cursor-pointer rounded-xl flex items-center gap-2 text-xs py-2"
+            >
+              <Bell className="size-4 text-purple-500" />
+              <span>Thử thông báo & Bong bóng</span>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => signOut()}

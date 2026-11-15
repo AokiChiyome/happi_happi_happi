@@ -121,12 +121,12 @@ export const FloatingChatHead: React.FC = () => {
 
   return (
     <div
-      className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 flex flex-col items-end pointer-events-none select-none"
+      className="fixed bottom-20 sm:bottom-6 right-3 sm:right-6 z-50 flex flex-col items-end pointer-events-none select-none"
       onClick={requestNotificationPermission}
     >
       {/* ================= 1. FLOATING MINI CHAT WINDOW ================= */}
       {isMiniChatOpen && (
-        <div className="pointer-events-auto mb-3 w-[330px] sm:w-[360px] h-[460px] bg-card/95 backdrop-blur-xl border border-pink-500/30 shadow-2xl rounded-3xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+        <div className="pointer-events-auto mb-3 w-[330px] sm:w-[360px] max-w-[calc(100vw-1.5rem)] h-[460px] max-h-[70vh] bg-card/95 backdrop-blur-xl border border-pink-500/30 shadow-2xl rounded-3xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
           {/* Header */}
           <div className="p-3.5 bg-gradient-to-r from-pink-500/15 via-purple-500/10 to-rose-500/15 border-b border-border/70 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
