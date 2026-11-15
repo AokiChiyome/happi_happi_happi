@@ -87,7 +87,11 @@ export const sendDirectMessage = async (req, res) => {
     chatEmitter.emit("new_message", {
       conversationId: conversation._id.toString(),
       message,
-      sender: { _id: senderId, displayName: req.user.displayName },
+      sender: {
+        _id: senderId,
+        displayName: req.user.displayName,
+        avatarUrl: req.user.avatarUrl,
+      },
       participantIds,
     });
 
@@ -144,7 +148,11 @@ export const sendGroupMessage = async (req, res) => {
     chatEmitter.emit("new_message", {
       conversationId: conversation._id.toString(),
       message,
-      sender: { _id: senderId, displayName: req.user.displayName },
+      sender: {
+        _id: senderId,
+        displayName: req.user.displayName,
+        avatarUrl: req.user.avatarUrl,
+      },
       participantIds,
     });
 

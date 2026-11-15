@@ -5,6 +5,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useAuthStore } from "./useAuthStore";
 import { usePostStore } from "./usePostStore";
+import { useNotificationStore } from "./useNotificationStore";
 import { toast } from "sonner";
 
 let sseConnection: EventSource | null = null;
@@ -378,6 +379,24 @@ export const useChatStore = create<ChatState>()(
 
                   const isCurrentActive = activeConversationId === convoId;
                   const isOwn = msg.senderId === currentUserId;
+
+                  // Kích hoạt bong bóng thông báo phong cách Facebook Messenger khi có tin nhắn từ đối phương
+                  if (!isOwn) {
+                    const senderName =
+                      payload.sender?.displayName || "Người yêu";
+                    const senderAvatar = payload.sender?.avatarUrl;
+                    const isLookingAtChat =
+                      isCurrentActive && get().currentTab === "chat";
+
+                    if (!isLookingAtChat) {
+                      useNotificationStore.getState().showBubble({
+                        senderName,
+                        senderAvatar,
+                        content: msg.content || "Đã gửi một tin nhắn 💕",
+                        conversationId: convoId,
+                      });
+                    }
+                  }
 
                   const updatedConvos = state.conversations.map((c) => {
                     if (c._id === convoId) {
