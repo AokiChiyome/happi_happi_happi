@@ -357,6 +357,16 @@ html, body {
   overscroll-behavior-y: none;
 }
 
+/* Ngăn chặn triệt để thanh cuộn ngang gây xấu giao diện */
+::-webkit-scrollbar:horizontal {
+  display: none !important;
+  height: 0px !important;
+}
+
+* {
+  scrollbar-width: thin;
+}
+
 .safe-area-bottom {
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
 }

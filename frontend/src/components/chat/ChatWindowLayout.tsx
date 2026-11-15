@@ -458,7 +458,7 @@ export const ChatWindowLayout: React.FC = () => {
       )}
 
       {/* ================= MESSAGE STREAM ================= */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-muted/10 scroll-touch">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 space-y-3 bg-muted/10 scroll-touch custom-scrollbar">
         {displayedMessages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-6 text-muted-foreground">
             <span className="text-4xl mb-2">💬</span>
@@ -491,357 +491,370 @@ export const ChatWindowLayout: React.FC = () => {
               <div
                 key={msg._id}
                 id={`msg-${msg._id}`}
-                className={`flex flex-col relative group transition-all duration-150 ${
-                  isMine ? "items-end" : "items-start"
+                className={`w-full flex my-1 group/msg transition-all duration-150 ${
+                  isMine ? "justify-end" : "justify-start"
                 }`}
               >
-                {/* THANH CÔNG CỤ HOVER TRÊN TIN NHẮN (REACT, REPLY, GHIM, THU HỒI) */}
-                {!isRecalled && !msg._id.startsWith("temp-") && (
-                  <div
-                    className={`absolute top-0 -translate-y-1/2 ${
-                      isMine ? "-left-24" : "-right-24"
-                    } hidden group-hover:flex items-center gap-1 bg-background/95 dark:bg-zinc-900/95 border border-border/80 rounded-full px-1.5 py-0.5 shadow-md z-20 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-100`}
-                  >
-                    {/* Nút Thả Cảm Xúc */}
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setActiveReactionPickerId(
-                            activeReactionPickerId === msg._id ? null : msg._id
-                          )
-                        }
-                        className="size-6 rounded-full hover:bg-muted flex items-center justify-center text-xs text-muted-foreground hover:text-pink-500 transition-colors"
-                        title="Bày tỏ cảm xúc"
-                      >
-                        <Smile className="size-3.5" />
-                      </button>
-
-                      {/* Bảng emoji thả nhanh */}
-                      {activeReactionPickerId === msg._id && (
-                        <div
-                          className={`absolute bottom-8 ${
-                            isMine ? "right-0" : "left-0"
-                          } flex items-center gap-1 bg-card/95 backdrop-blur-md border border-border/90 rounded-full p-1.5 shadow-xl z-40 animate-in zoom-in-90 duration-150`}
+                <div
+                  className={`flex items-center gap-1.5 max-w-[85%] sm:max-w-[75%] ${
+                    isMine ? "flex-row-reverse" : "flex-row"
+                  }`}
+                >
+                  {/* BONG BÓNG TIN NHẮN */}
+                  <div className={`flex flex-col min-w-0 ${isMine ? "items-end" : "items-start"}`}>
+                    {/* 1. TIN NHẮN ĐÃ ĐƯỢC THU HỒI */}
+                    {isRecalled ? (
+                      <div className="max-w-full">
+                        <div className="px-3.5 py-2 rounded-2xl text-xs italic text-muted-foreground flex items-center gap-2 bg-muted/30 border border-border/40 select-none">
+                          <Ban className="size-3.5 text-muted-foreground/60" />
+                          <span>Tin nhắn đã được thu hồi</span>
+                        </div>
+                        <span
+                          className={`text-[10px] text-muted-foreground block px-1 mt-0.5 ${
+                            isMine ? "text-right" : "text-left"
+                          }`}
                         >
-                          {QUICK_EMOJIS.map((emoji) => (
-                            <button
-                              key={emoji}
-                              type="button"
-                              onClick={() => {
-                                triggerHaptic("light");
-                                toggleMessageReaction(msg._id, emoji);
-                                setActiveReactionPickerId(null);
-                              }}
-                              className="size-7 rounded-full hover:bg-muted flex items-center justify-center text-base transition-transform hover:scale-135 active:scale-95"
-                            >
-                              {emoji}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Nút Trả Lời (Reply) */}
-                    <button
-                      type="button"
-                      onClick={() => setReplyingToMessage(msg)}
-                      className="size-6 rounded-full hover:bg-muted flex items-center justify-center text-xs text-muted-foreground hover:text-primary transition-colors"
-                      title="Trả lời tin nhắn này"
-                    >
-                      <CornerUpLeft className="size-3.5" />
-                    </button>
-
-                    {/* Nút Ghim tin nhắn (Pin) */}
-                    <button
-                      type="button"
-                      onClick={() => pinMessage(activeConvo._id, msg._id)}
-                      className="size-6 rounded-full hover:bg-muted flex items-center justify-center text-xs text-muted-foreground hover:text-amber-500 transition-colors"
-                      title="Ghim tin nhắn này lên đầu"
-                    >
-                      <Pin className="size-3.5" />
-                    </button>
-
-                    {/* Nút Lưu vào Sổ tay ẩm thực & Yêu thích (Bookmark) */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        addBookmark({
-                          type: "message",
-                          targetId: msg._id,
-                          title: `Tin nhắn từ ${msg.sender?.displayName || "Bạn"}`,
-                          content: msg.content || "",
-                          emoji: "⭐",
-                        });
-                      }}
-                      className="size-6 rounded-full hover:bg-amber-500/10 flex items-center justify-center text-xs text-muted-foreground hover:text-amber-500 transition-colors"
-                      title="Lưu vào Sổ tay yêu thích"
-                    >
-                      <Bookmark className="size-3.5" />
-                    </button>
-
-                    {/* Nút Thu hồi tin nhắn */}
-                    {isMine && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              "Bạn có chắc chắn muốn thu hồi tin nhắn này không?"
-                            )
-                          ) {
-                            recallMessage(msg._id);
-                          }
-                        }}
-                        className="size-6 rounded-full hover:bg-red-500/10 flex items-center justify-center text-xs text-muted-foreground hover:text-red-500 transition-colors"
-                        title="Thu hồi tin nhắn"
-                      >
-                        <Undo2 className="size-3.5" />
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* 1. TIN NHẮN ĐÃ ĐƯỢC THU HỒI */}
-                {isRecalled ? (
-                  <div className="max-w-[78%]">
-                    <div className="px-3.5 py-2 rounded-2xl text-xs italic text-muted-foreground flex items-center gap-2 bg-muted/30 border border-border/40 select-none">
-                      <Ban className="size-3.5 text-muted-foreground/60" />
-                      <span>Tin nhắn đã được thu hồi</span>
-                    </div>
-                    <span
-                      className={`text-[10px] text-muted-foreground block px-1 mt-0.5 ${
-                        isMine ? "text-right" : "text-left"
-                      }`}
-                    >
-                      {timeStr}
-                    </span>
-                  </div>
-                ) : isAudio ? (
-                  /* 2. TIN NHẮN THOẠI (VOICE NOTE AUDIO PLAYER - TELEGRAM STYLE) */
-                  <div className="max-w-[78%]">
-                    <div
-                      className={`p-3 rounded-2xl flex items-center gap-3 shadow-sm ${
-                        isMine
-                          ? "bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-br-xs"
-                          : "bg-card text-foreground border border-border/80 rounded-bl-xs"
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => togglePlayAudio(msg._id, msg.audioURL || undefined)}
-                        className={`size-10 rounded-full flex items-center justify-center shadow-md transition-transform active:scale-95 ${
-                          isMine
-                            ? "bg-white text-pink-600"
-                            : "bg-pink-500 text-white"
-                        }`}
-                      >
-                        {playingAudioId === msg._id ? (
-                          <Pause className="size-5 fill-current" />
-                        ) : (
-                          <Play className="size-5 fill-current ml-0.5" />
-                        )}
-                      </button>
-
-                      {/* Thanh hiển thị sóng âm / tiến trình */}
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1">
-                          <Volume2 className="size-3.5 opacity-80" />
-                          <span className="text-xs font-bold">
-                            Tin nhắn thoại ({msg.audioDuration ? `${msg.audioDuration}s` : "Ghi âm"})
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-0.5 h-3">
-                          {[3, 7, 12, 6, 14, 9, 5, 11, 4, 8, 13, 6, 10, 4].map((h, i) => (
-                            <span
-                              key={i}
-                              style={{ height: `${h}px` }}
-                              className={`w-1 rounded-full ${
-                                playingAudioId === msg._id
-                                  ? "bg-amber-300 animate-pulse"
-                                  : isMine
-                                  ? "bg-white/60"
-                                  : "bg-pink-500/60"
-                              }`}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                    <span
-                      className={`text-[10px] text-muted-foreground block px-1 mt-0.5 ${
-                        isMine ? "text-right" : "text-left"
-                      }`}
-                    >
-                      {timeStr}
-                    </span>
-                  </div>
-                ) : isFoodCard ? (
-                  /* 3. THẺ GỢI Ý MÓN ĂN */
-                  <div className="max-w-md w-full bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/30 border-2 border-amber-300 dark:border-amber-700/60 rounded-3xl p-4 shadow-md text-foreground">
-                    <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-1">
-                      <span>🍽️</span> Gợi ý món ăn tình yêu
-                    </div>
-
-                    <div className="text-base font-black text-amber-900 dark:text-amber-200 mt-1">
-                      {msg.content
-                        ?.split("\n")[0]
-                        .replace("🍽️ [Gợi ý món ăn]:", "")
-                        .replace(/\*\*/g, "")
-                        .trim()}
-                    </div>
-
-                    {msg.content?.includes("💌 Lời nhắn:") && (
-                      <div className="text-xs text-amber-800 dark:text-amber-300/80 italic mt-2 p-2 bg-amber-100/60 dark:bg-amber-900/40 rounded-xl">
-                        {msg.content.split("💌 Lời nhắn:")[1].trim()}
-                      </div>
-                    )}
-
-                    <div className="mt-3 pt-2 border-t border-amber-200 dark:border-amber-800/50 flex items-center justify-between">
-                      <a
-                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                          (msg.content
-                            ?.split("\n")[0]
-                            .replace("🍽️ [Gợi ý món ăn]:", "")
-                            .replace(/\*\*/g, "")
-                            .trim() || "") + " gần đây"
-                        )}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 hover:text-amber-800 dark:text-amber-400"
-                      >
-                        <MapPin className="size-3" /> Tìm quán gần đây
-                      </a>
-                      <span className="text-[10px] text-muted-foreground">
-                        {timeStr}
-                      </span>
-                    </div>
-                  </div>
-                ) : isSticker ? (
-                  /* 4. NHÃN DÁN STICKER */
-                  <div className="max-w-[78%] flex flex-col my-1 group">
-                    {msg.replyTo && (
-                      <div
-                        onClick={() => scrollToMessage(msg.replyTo?.messageId)}
-                        className={`mb-1 px-2.5 py-1 rounded-xl text-xs flex flex-col cursor-pointer transition-opacity hover:opacity-100 ${
-                          isMine
-                            ? "bg-muted/80 text-foreground border-l-2 border-primary/80 self-end"
-                            : "bg-muted/80 text-foreground border-l-2 border-primary/80 self-start"
-                        }`}
-                      >
-                        <span className="font-bold text-[10px] flex items-center gap-1 opacity-90">
-                          <CornerUpLeft className="size-2.5 inline" />
-                          {msg.replyTo.senderName || "Người dùng"}
-                        </span>
-                        <span className="truncate text-[10px] opacity-80 max-w-xs">
-                          {msg.replyTo.content || "[Hình ảnh/Nhãn dán]"}
+                          {timeStr}
                         </span>
                       </div>
-                    )}
-
-                    <div className="p-1 rounded-3xl hover:bg-muted/40 transition-colors inline-block">
-                      <img
-                        src={stickerSrc || ""}
-                        alt={msg.content || "Sticker"}
-                        onClick={() => stickerSrc && openLightbox(stickerSrc, "Nhãn dán")}
-                        className="size-28 sm:size-36 object-contain hover:scale-115 active:scale-95 transition-transform duration-200 cursor-pointer drop-shadow-md select-none"
-                        loading="lazy"
-                      />
-                    </div>
-                    {msg.content &&
-                      msg.content !== "[Nhãn dán]" &&
-                      !msg.content.startsWith("[Nhãn dán:") && (
+                    ) : isAudio ? (
+                      /* 2. TIN NHẮN THOẠI (VOICE NOTE AUDIO PLAYER - TELEGRAM STYLE) */
+                      <div className="max-w-full">
                         <div
-                          className={`px-3 py-1.5 rounded-2xl text-xs mt-1 shadow-xs max-w-full break-words ${
+                          className={`p-3 rounded-2xl flex items-center gap-3 shadow-sm ${
                             isMine
                               ? "bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-br-xs"
                               : "bg-card text-foreground border border-border/80 rounded-bl-xs"
                           }`}
                         >
-                          {msg.content}
+                          <button
+                            type="button"
+                            onClick={() => togglePlayAudio(msg._id, msg.audioURL || undefined)}
+                            className={`size-10 rounded-full flex items-center justify-center shadow-md transition-transform active:scale-95 ${
+                              isMine
+                                ? "bg-white text-pink-600"
+                                : "bg-pink-500 text-white"
+                            }`}
+                          >
+                            {playingAudioId === msg._id ? (
+                              <Pause className="size-5 fill-current" />
+                            ) : (
+                              <Play className="size-5 fill-current ml-0.5" />
+                            )}
+                          </button>
+
+                          {/* Thanh hiển thị sóng âm / tiến trình */}
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1">
+                              <Volume2 className="size-3.5 opacity-80" />
+                              <span className="text-xs font-bold">
+                                Tin nhắn thoại ({msg.audioDuration ? `${msg.audioDuration}s` : "Ghi âm"})
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-0.5 h-3">
+                              {[3, 7, 12, 6, 14, 9, 5, 11, 4, 8, 13, 6, 10, 4].map((h, i) => (
+                                <span
+                                  key={i}
+                                  style={{ height: `${h}px` }}
+                                  className={`w-1 rounded-full ${
+                                    playingAudioId === msg._id
+                                      ? "bg-amber-300 animate-pulse"
+                                      : isMine
+                                      ? "bg-white/60"
+                                      : "bg-pink-500/60"
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          </div>
                         </div>
-                      )}
-                    <span
-                      className={`text-[10px] text-muted-foreground block px-1 mt-0.5 ${
-                        isMine ? "text-right" : "text-left"
-                      }`}
-                    >
-                      {timeStr}
-                    </span>
-                  </div>
-                ) : (
-                  /* 5. BONG BÓNG TIN NHẮN VĂN BẢN TIÊU CHUẨN */
-                  <div className="max-w-[78%]">
-                    <div
-                      className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words shadow-sm ${
-                        isMine
-                          ? "bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-br-xs"
-                          : "bg-card text-foreground border border-border/80 rounded-bl-xs"
-                      }`}
-                    >
-                      {msg.replyTo && (
-                        <div
-                          onClick={() => scrollToMessage(msg.replyTo?.messageId)}
-                          className={`mb-2 px-2.5 py-1 rounded-xl text-xs flex flex-col cursor-pointer transition-opacity hover:opacity-100 ${
-                            isMine
-                              ? "bg-white/20 text-white/95 border-l-2 border-white/80"
-                              : "bg-muted/80 text-foreground border-l-2 border-primary/80"
+                        <span
+                          className={`text-[10px] text-muted-foreground block px-1 mt-0.5 ${
+                            isMine ? "text-right" : "text-left"
                           }`}
                         >
-                          <span className="font-bold text-[10px] flex items-center gap-1 opacity-90">
-                            <CornerUpLeft className="size-2.5 inline" />
-                            {msg.replyTo.senderName || "Người dùng"}
-                          </span>
-                          <span className="truncate text-[10px] opacity-80 max-w-xs">
-                            {msg.replyTo.content || "[Hình ảnh/Nhãn dán]"}
+                          {timeStr}
+                        </span>
+                      </div>
+                    ) : isFoodCard ? (
+                      /* 3. THẺ GỢI Ý MÓN ĂN */
+                      <div className="max-w-md w-full bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/30 border-2 border-amber-300 dark:border-amber-700/60 rounded-3xl p-4 shadow-md text-foreground">
+                        <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-1">
+                          <span>🍽️</span> Gợi ý món ăn tình yêu
+                        </div>
+
+                        <div className="text-base font-black text-amber-900 dark:text-amber-200 mt-1">
+                          {msg.content
+                            ?.split("\n")[0]
+                            .replace("🍽️ [Gợi ý món ăn]:", "")
+                            .replace(/\*\*/g, "")
+                            .trim()}
+                        </div>
+
+                        {msg.content?.includes("💌 Lời nhắn:") && (
+                          <div className="text-xs text-amber-800 dark:text-amber-300/80 italic mt-2 p-2 bg-amber-100/60 dark:bg-amber-900/40 rounded-xl">
+                            {msg.content.split("💌 Lời nhắn:")[1].trim()}
+                          </div>
+                        )}
+
+                        <div className="mt-3 pt-2 border-t border-amber-200 dark:border-amber-800/50 flex items-center justify-between">
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                              (msg.content
+                                ?.split("\n")[0]
+                                .replace("🍽️ [Gợi ý món ăn]:", "")
+                                .replace(/\*\*/g, "")
+                                .trim() || "") + " gần đây"
+                            )}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 hover:text-amber-800 dark:text-amber-400"
+                          >
+                            <MapPin className="size-3" /> Tìm quán gần đây
+                          </a>
+                          <span className="text-[10px] text-muted-foreground">
+                            {timeStr}
                           </span>
                         </div>
-                      )}
-
-                      {msg.content}
-                    </div>
-
-                    <span
-                      className={`text-[10px] text-muted-foreground block px-1 mt-0.5 ${
-                        isMine ? "text-right" : "text-left"
-                      }`}
-                    >
-                      {msg._id.startsWith("temp-") ? "Đang gửi... ✨" : timeStr}
-                    </span>
-                  </div>
-                )}
-
-                {/* DANH SÁCH BIỂU TƯỢNG CẢM XÚC (REACTIONS BADGE) */}
-                {groupedReactions.length > 0 && !isRecalled && (
-                  <div
-                    className={`flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-full text-[11px] bg-background/90 dark:bg-zinc-800/90 border border-border/70 shadow-xs select-none ${
-                      isMine ? "self-end" : "self-start"
-                    }`}
-                  >
-                    {groupedReactions.map(([emoji, info]) => (
-                      <button
-                        key={emoji}
-                        type="button"
-                        onClick={() => toggleMessageReaction(msg._id, emoji)}
-                        className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full transition-transform hover:scale-115 ${
-                          info.reactedByMe
-                            ? "bg-pink-500/20 text-pink-600 dark:text-pink-400 font-bold border border-pink-500/30"
-                            : "hover:bg-muted text-foreground"
-                        }`}
-                        title={
-                          info.reactedByMe
-                            ? "Bạn đã thả cảm xúc này (Bấm để gỡ)"
-                            : "Bấm để thả cảm xúc"
-                        }
-                      >
-                        <span>{emoji}</span>
-                        {info.count > 1 && (
-                          <span className="text-[10px]">{info.count}</span>
+                      </div>
+                    ) : isSticker ? (
+                      /* 4. NHÃN DÁN STICKER */
+                      <div className="max-w-full flex flex-col my-1 group">
+                        {msg.replyTo && (
+                          <div
+                            onClick={() => scrollToMessage(msg.replyTo?.messageId)}
+                            className={`mb-1 px-2.5 py-1 rounded-xl text-xs flex flex-col cursor-pointer transition-opacity hover:opacity-100 ${
+                              isMine
+                                ? "bg-muted/80 text-foreground border-l-2 border-primary/80 self-end"
+                                : "bg-muted/80 text-foreground border-l-2 border-primary/80 self-start"
+                            }`}
+                          >
+                            <span className="font-bold text-[10px] flex items-center gap-1 opacity-90">
+                              <CornerUpLeft className="size-2.5 inline" />
+                              {msg.replyTo.senderName || "Người dùng"}
+                            </span>
+                            <span className="truncate text-[10px] opacity-80 max-w-xs">
+                              {msg.replyTo.content || "[Hình ảnh/Nhãn dán]"}
+                            </span>
+                          </div>
                         )}
-                      </button>
-                    ))}
+
+                        <div className="p-1 rounded-3xl hover:bg-muted/40 transition-colors inline-block">
+                          <img
+                            src={stickerSrc || ""}
+                            alt={msg.content || "Sticker"}
+                            onClick={() => stickerSrc && openLightbox(stickerSrc, "Nhãn dán")}
+                            className="size-28 sm:size-36 object-contain hover:scale-115 active:scale-95 transition-transform duration-200 cursor-pointer drop-shadow-md select-none"
+                            loading="lazy"
+                          />
+                        </div>
+                        {msg.content &&
+                          msg.content !== "[Nhãn dán]" &&
+                          !msg.content.startsWith("[Nhãn dán:") && (
+                            <div
+                              className={`px-3 py-1.5 rounded-2xl text-xs mt-1 shadow-xs max-w-full break-words ${
+                                isMine
+                                  ? "bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-br-xs"
+                                  : "bg-card text-foreground border border-border/80 rounded-bl-xs"
+                              }`}
+                            >
+                              {msg.content}
+                            </div>
+                          )}
+                        <span
+                          className={`text-[10px] text-muted-foreground block px-1 mt-0.5 ${
+                            isMine ? "text-right" : "text-left"
+                          }`}
+                        >
+                          {timeStr}
+                        </span>
+                      </div>
+                    ) : (
+                      /* 5. BONG BÓNG TIN NHẮN VĂN BẢN TIÊU CHUẨN */
+                      <div className="max-w-full">
+                        <div
+                          className={`px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words shadow-sm ${
+                            isMine
+                              ? "bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-br-xs"
+                              : "bg-card text-foreground border border-border/80 rounded-bl-xs"
+                          }`}
+                        >
+                          {msg.replyTo && (
+                            <div
+                              onClick={() => scrollToMessage(msg.replyTo?.messageId)}
+                              className={`mb-2 px-2.5 py-1 rounded-xl text-xs flex flex-col cursor-pointer transition-opacity hover:opacity-100 ${
+                                isMine
+                                  ? "bg-white/20 text-white/95 border-l-2 border-white/80"
+                                  : "bg-muted/80 text-foreground border-l-2 border-primary/80"
+                              }`}
+                            >
+                              <span className="font-bold text-[10px] flex items-center gap-1 opacity-90">
+                                <CornerUpLeft className="size-2.5 inline" />
+                                {msg.replyTo.senderName || "Người dùng"}
+                              </span>
+                              <span className="truncate text-[10px] opacity-80 max-w-xs">
+                                {msg.replyTo.content || "[Hình ảnh/Nhãn dán]"}
+                              </span>
+                            </div>
+                          )}
+
+                          {msg.content}
+                        </div>
+
+                        <span
+                          className={`text-[10px] text-muted-foreground block px-1 mt-0.5 ${
+                            isMine ? "text-right" : "text-left"
+                          }`}
+                        >
+                          {msg._id.startsWith("temp-") ? "Đang gửi... ✨" : timeStr}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* DANH SÁCH BIỂU TƯỢNG CẢM XÚC (REACTIONS BADGE) */}
+                    {groupedReactions.length > 0 && !isRecalled && (
+                      <div
+                        className={`flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-full text-[11px] bg-background/90 dark:bg-zinc-800/90 border border-border/70 shadow-xs select-none ${
+                          isMine ? "self-end" : "self-start"
+                        }`}
+                      >
+                        {groupedReactions.map(([emoji, info]) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => toggleMessageReaction(msg._id, emoji)}
+                            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full transition-transform hover:scale-115 ${
+                              info.reactedByMe
+                                ? "bg-pink-500/20 text-pink-600 dark:text-pink-400 font-bold border border-pink-500/30"
+                                : "hover:bg-muted text-foreground"
+                            }`}
+                            title={
+                              info.reactedByMe
+                                ? "Bạn đã thả cảm xúc này (Bấm để gỡ)"
+                                : "Bấm để thả cảm xúc"
+                            }
+                          >
+                            <span>{emoji}</span>
+                            {info.count > 1 && (
+                              <span className="text-[10px]">{info.count}</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
+
+                  {/* THANH CÔNG CỤ HOVER: NẰM NGAY CẠNH BONG BÓNG TIN NHẮN (KHÔNG BỊ LỆCH HOẶC TRÀN THANH TRƯỢT) */}
+                  {!isRecalled && !msg._id.startsWith("temp-") && (
+                    <div
+                      className="opacity-0 group-hover/msg:opacity-100 focus-within:opacity-100 transition-opacity duration-150 flex items-center gap-0.5 bg-background/95 dark:bg-zinc-900/95 border border-border/80 rounded-full px-1.5 py-0.5 shadow-md backdrop-blur-xs shrink-0 self-center"
+                    >
+                      {/* Nút Thả Cảm Xúc */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setActiveReactionPickerId(
+                              activeReactionPickerId === msg._id ? null : msg._id
+                            )
+                          }
+                          className="size-6 rounded-full hover:bg-muted flex items-center justify-center text-xs text-muted-foreground hover:text-pink-500 transition-colors"
+                          title="Bày tỏ cảm xúc"
+                        >
+                          <Smile className="size-3.5" />
+                        </button>
+
+                        {/* Bảng emoji thả nhanh */}
+                        {activeReactionPickerId === msg._id && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-30"
+                              onClick={() => setActiveReactionPickerId(null)}
+                            />
+                            <div
+                              className={`absolute bottom-full mb-1.5 ${
+                                isMine ? "right-0" : "left-0"
+                              } flex items-center gap-1 bg-card/95 backdrop-blur-md border border-border/90 rounded-full p-1.5 shadow-xl z-40 animate-in zoom-in-90 duration-150`}
+                            >
+                              {QUICK_EMOJIS.map((emoji) => (
+                                <button
+                                  key={emoji}
+                                  type="button"
+                                  onClick={() => {
+                                    triggerHaptic("light");
+                                    toggleMessageReaction(msg._id, emoji);
+                                    setActiveReactionPickerId(null);
+                                  }}
+                                  className="size-7 rounded-full hover:bg-muted flex items-center justify-center text-base transition-transform hover:scale-135 active:scale-95"
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Nút Trả Lời (Reply) */}
+                      <button
+                        type="button"
+                        onClick={() => setReplyingToMessage(msg)}
+                        className="size-6 rounded-full hover:bg-muted flex items-center justify-center text-xs text-muted-foreground hover:text-primary transition-colors"
+                        title="Trả lời tin nhắn này"
+                      >
+                        <CornerUpLeft className="size-3.5" />
+                      </button>
+
+                      {/* Nút Ghim tin nhắn (Pin) */}
+                      <button
+                        type="button"
+                        onClick={() => pinMessage(activeConvo._id, msg._id)}
+                        className="size-6 rounded-full hover:bg-muted flex items-center justify-center text-xs text-muted-foreground hover:text-amber-500 transition-colors"
+                        title="Ghim tin nhắn này lên đầu"
+                      >
+                        <Pin className="size-3.5" />
+                      </button>
+
+                      {/* Nút Lưu vào Sổ tay ẩm thực & Yêu thích (Bookmark) */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          addBookmark({
+                            type: "message",
+                            targetId: msg._id,
+                            title: `Tin nhắn từ ${msg.sender?.displayName || "Bạn"}`,
+                            content: msg.content || "",
+                            emoji: "⭐",
+                          });
+                        }}
+                        className="size-6 rounded-full hover:bg-amber-500/10 flex items-center justify-center text-xs text-muted-foreground hover:text-amber-500 transition-colors"
+                        title="Lưu vào Sổ tay yêu thích"
+                      >
+                        <Bookmark className="size-3.5" />
+                      </button>
+
+                      {/* Nút Thu hồi tin nhắn */}
+                      {isMine && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                "Bạn có chắc chắn muốn thu hồi tin nhắn này không?"
+                              )
+                            ) {
+                              recallMessage(msg._id);
+                            }
+                          }}
+                          className="size-6 rounded-full hover:bg-red-500/10 flex items-center justify-center text-xs text-muted-foreground hover:text-red-500 transition-colors"
+                          title="Thu hồi tin nhắn"
+                        >
+                          <Undo2 className="size-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             );
           })
