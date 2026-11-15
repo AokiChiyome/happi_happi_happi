@@ -11,7 +11,6 @@ import {
   Dices,
   Sparkles,
   MapPin,
-  Smile,
   MoreVertical,
   Users,
   Search,

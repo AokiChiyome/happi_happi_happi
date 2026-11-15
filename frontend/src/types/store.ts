@@ -56,6 +56,7 @@ export interface ChatState {
     emoji: string;
     note?: string;
   }) => Promise<void>;
+  markConversationAsSeen: (conversationId: string) => Promise<void>;
   fetchFriends: () => Promise<void>;
   fetchFriendRequests: () => Promise<void>;
   sendFriendRequest: (toUsername: string, message?: string) => Promise<void>;
