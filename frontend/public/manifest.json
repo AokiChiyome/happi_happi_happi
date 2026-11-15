@@ -1,0 +1,18 @@
+{
+  "short_name": "Happi 💕",
+  "name": "Happi - Nhật Ký & Ẩm Thực Cặp Đôi",
+  "description": "Mạng xã hội riêng tư và gợi ý ẩm thực bí mật dành riêng cho hai bạn 💕",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512 any",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#ffffff",
+  "theme_color": "#ec4899",
+  "display": "standalone",
+  "orientation": "portrait"
+}
