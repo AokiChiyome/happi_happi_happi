@@ -14,6 +14,7 @@ export const connectDB = async () => {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
+      dbName: "happi_chat",
     };
 
     cached.promise = mongoose
