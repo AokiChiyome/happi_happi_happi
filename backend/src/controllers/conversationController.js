@@ -2,6 +2,7 @@ import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
 import mongoose from "mongoose";
 import { chatEmitter } from "../libs/eventBus.js";
+import { decryptText } from "../utils/cryptoHelper.js";
 
 export const createConversation = async (req, res) => {
   try {
@@ -141,8 +142,13 @@ export const getConversations = async (req, res) => {
         joinedAt: p.joinedAt,
       }));
 
+      const convoObj = convo.toObject();
+      if (convoObj.lastMessage?.content) {
+        convoObj.lastMessage.content = decryptText(convoObj.lastMessage.content);
+      }
+
       return {
-        ...convo.toObject(),
+        ...convoObj,
         unreadCounts: convo.unreadCounts || {},
         participants,
       };
@@ -202,7 +208,13 @@ export const getMessage = async (req, res) => {
       messages.pop();
     }
 
-    messages = messages.reverse();
+    messages = messages.reverse().map((msg) => {
+      const obj = msg.toObject();
+      if (obj.content) {
+        obj.content = decryptText(obj.content);
+      }
+      return obj;
+    });
 
     return res.status(200).json({
       messages,

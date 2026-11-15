@@ -204,6 +204,24 @@ export const refreshToken = async (req, res) => {
       return res.status(500).json({ message: "Lỗi cấu hình bảo mật máy chủ" });
     }
 
+    // OWASP: Refresh Token Rotation (Xoay vòng Token chống Replay Attack)
+    await Session.deleteOne({ _id: session._id });
+
+    const newRefreshToken = crypto.randomBytes(64).toString("hex");
+    await Session.create({
+      userId: session.userId,
+      refreshToken: newRefreshToken,
+      expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL),
+    });
+
+    const isProduction = process.env.NODE_ENV === "production";
+    res.cookie("refreshToken", newRefreshToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "strict" : "lax",
+      maxAge: REFRESH_TOKEN_TTL,
+    });
+
     const accessToken = jwt.sign(
       { userId: session.userId },
       process.env.ACCESS_TOKEN_SECRET,

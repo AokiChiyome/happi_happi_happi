@@ -67,10 +67,10 @@ app.use(
       // Cho phép request không có origin (như curl, mobile apps, SSR)
       if (!origin) return callback(null, true);
 
-      // Cho phép localhost, domain đã cấu hình, hoặc preview từ Vercel
+      // Cho phép localhost, domain đã cấu hình trong CLIENT_URL, hoặc project Vercel của ứng dụng Happi
       const isAllowed =
         allowedOrigins.includes(origin) ||
-        /^https:\/\/[a-zA-Z0-9-]+\.vercel\.app$/.test(origin);
+        /^https:\/\/happi[a-zA-Z0-9-]*\.vercel\.app$/.test(origin);
 
       if (isAllowed) {
         callback(null, true);

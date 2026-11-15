@@ -2,6 +2,7 @@ import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
 import { updateconversationAfterCreateMessage } from "../utils/messageHelper.js";
 import { chatEmitter } from "../libs/eventBus.js";
+import { encryptText } from "../utils/cryptoHelper.js";
 import mongoose from "mongoose";
 
 export const sendDirectMessage = async (req, res) => {
@@ -75,11 +76,12 @@ export const sendDirectMessage = async (req, res) => {
       }
     }
 
-    // 4. Tạo tin nhắn
+    // 4. Tạo tin nhắn mã hóa AES-256-GCM bảo vệ quyền riêng tư tuyệt đối tại chỗ (Data at rest)
+    const encryptedContent = encryptText(finalContent);
     const message = await Message.create({
       conversationId: conversation._id,
       senderId,
-      content: finalContent,
+      content: encryptedContent,
       imgURL: cleanImgURL || undefined,
     });
 
@@ -89,9 +91,14 @@ export const sendDirectMessage = async (req, res) => {
     // 5. Lấy danh sách ID các thành viên để chỉ phát cho đúng người trong cuộc trò chuyện (CHỐNG LỘ DỮ LIỆU)
     const participantIds = conversation.participants.map((p) => p.userId.toString());
 
+    const deliveredMessage = {
+      ...message.toObject(),
+      content: finalContent, // Gửi nội dung đã giải mã cho người tham gia
+    };
+
     chatEmitter.emit("new_message", {
       conversationId: conversation._id.toString(),
-      message,
+      message: deliveredMessage,
       sender: {
         _id: senderId,
         displayName: req.user.displayName,
@@ -100,7 +107,7 @@ export const sendDirectMessage = async (req, res) => {
       participantIds,
     });
 
-    return res.status(201).json({ message });
+    return res.status(201).json({ message: deliveredMessage });
   } catch (error) {
     console.error("Lỗi khi gửi tin nhắn trực tiếp:", error);
     return res.status(500).json({ message: "Lỗi hệ thống khi gửi tin nhắn" });
@@ -142,10 +149,11 @@ export const sendGroupMessage = async (req, res) => {
       return res.status(403).json({ message: "Bạn không phải thành viên của nhóm này" });
     }
 
+    const encryptedContent = encryptText(finalContent);
     const message = await Message.create({
       conversationId,
       senderId,
-      content: finalContent,
+      content: encryptedContent,
       imgURL: cleanImgURL || undefined,
     });
 
@@ -155,9 +163,14 @@ export const sendGroupMessage = async (req, res) => {
     // CHỈ PHÁT CHO THÀNH VIÊN NHÓM
     const participantIds = conversation.participants.map((p) => p.userId.toString());
 
+    const deliveredMessage = {
+      ...message.toObject(),
+      content: finalContent,
+    };
+
     chatEmitter.emit("new_message", {
       conversationId: conversation._id.toString(),
-      message,
+      message: deliveredMessage,
       sender: {
         _id: senderId,
         displayName: req.user.displayName,
@@ -166,7 +179,7 @@ export const sendGroupMessage = async (req, res) => {
       participantIds,
     });
 
-    return res.status(201).json({ message });
+    return res.status(201).json({ message: deliveredMessage });
   } catch (error) {
     console.error("Lỗi khi gửi tin nhắn nhóm:", error);
     return res.status(500).json({ message: "Lỗi hệ thống khi gửi tin nhắn nhóm" });

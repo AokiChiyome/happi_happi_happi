@@ -4,6 +4,7 @@ import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
 import { updateconversationAfterCreateMessage } from "../utils/messageHelper.js";
 import { chatEmitter } from "../libs/eventBus.js";
+import { encryptText } from "../utils/cryptoHelper.js";
 import mongoose from "mongoose";
 
 const pair = (a, b) => (a < b ? [a, b] : [b, a]);
@@ -115,11 +116,12 @@ export const connectPartner = async (req, res) => {
       });
     }
 
-    // Gửi tin nhắn chào mừng tự động
+    // Gửi tin nhắn chào mừng tự động được mã hóa AES-256-GCM
+    const welcomeRawText = `🎉 Chúng mình đã kết nối thành công trên "Hôm nay em muốn ăn gì?" rồi nè! 💖`;
     const welcomeMsg = await Message.create({
       conversationId: conversation._id,
       senderId: userId,
-      content: `🎉 Chúng mình đã kết nối thành công trên "Hôm nay em muốn ăn gì?" rồi nè! 💖`,
+      content: encryptText(welcomeRawText),
     });
 
     updateconversationAfterCreateMessage(conversation, welcomeMsg, userId);
@@ -129,7 +131,7 @@ export const connectPartner = async (req, res) => {
 
     chatEmitter.emit("new_message", {
       conversationId: conversation._id.toString(),
-      message: welcomeMsg,
+      message: { ...welcomeMsg.toObject(), content: welcomeRawText },
       sender: { _id: req.user._id, displayName: req.user.displayName },
       participantIds,
     });
@@ -189,7 +191,7 @@ export const shareDish = async (req, res) => {
     const message = await Message.create({
       conversationId,
       senderId,
-      content,
+      content: encryptText(content),
     });
 
     updateconversationAfterCreateMessage(conversation, message, senderId);
@@ -197,14 +199,19 @@ export const shareDish = async (req, res) => {
 
     const participantIds = conversation.participants.map((p) => p.userId.toString());
 
+    const deliveredMessage = {
+      ...message.toObject(),
+      content,
+    };
+
     chatEmitter.emit("new_message", {
       conversationId: conversation._id.toString(),
-      message,
+      message: deliveredMessage,
       sender: { _id: senderId, displayName: req.user.displayName },
       participantIds,
     });
 
-    return res.status(201).json({ message });
+    return res.status(201).json({ message: deliveredMessage });
   } catch (error) {
     console.error("Lỗi khi chia sẻ món ăn:", error);
     return res.status(500).json({ message: "Lỗi hệ thống khi chia sẻ món" });
@@ -224,7 +231,11 @@ export const streamMessages = (req, res) => {
   res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no"); // Ngăn chặn buffering ở Vercel, Cloudflare, Nginx
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  const reqOrigin = req.headers.origin;
+  if (reqOrigin) {
+    res.setHeader("Access-Control-Allow-Origin", reqOrigin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
   res.flushHeaders?.();
 
   // Gửi sự kiện kết nối ban đầu
