@@ -42,10 +42,12 @@ export interface ChatState {
   friends: any[];
   friendRequests: { sent: any[]; received: any[] };
   isFoodRouletteOpen: boolean;
+  currentTab: "chat" | "feed";
   loading: boolean;
 
   reset: () => void;
   setActiveConversation: (id: string | null) => void;
+  setCurrentTab: (tab: "chat" | "feed") => void;
   setFoodRouletteOpen: (open: boolean) => void;
   fetchConversations: () => Promise<void>;
   fetchMessages: (conversationId: string) => Promise<void>;

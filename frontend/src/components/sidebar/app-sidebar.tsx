@@ -11,7 +11,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { Moon, Sun, Dices } from "lucide-react";
+import { Moon, Sun, Dices, MessageSquare, Camera } from "lucide-react";
 import { Switch } from "../ui/switch";
 import { Button } from "../ui/button";
 import CreateNewChat from "../chat/CreateNewChat";
@@ -27,7 +27,7 @@ import { useChatStore } from "@/stores/useChatStore";
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { isDark, toggleTheme } = useThemeStore();
   const { user } = useAuthStore();
-  const { setFoodRouletteOpen } = useChatStore();
+  const { setFoodRouletteOpen, currentTab, setCurrentTab } = useChatStore();
 
   const currentUserData = {
     name: user?.displayName || user?.username || "Người dùng",
@@ -65,6 +65,37 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       {/* Content */}
       <SidebarContent>
+        {/* Navigation Switcher: Trò chuyện & Bảng Tin Cặp Đôi */}
+        <div className="px-3 pt-3">
+          <div className="grid grid-cols-2 p-1 bg-muted/60 rounded-2xl border border-border/80">
+            <button
+              type="button"
+              onClick={() => setCurrentTab("chat")}
+              className={`flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                currentTab === "chat"
+                  ? "bg-background text-primary shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <MessageSquare className="size-3.5" />
+              <span>Trò Chuyện</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setCurrentTab("feed")}
+              className={`flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-all ${
+                currentTab === "feed"
+                  ? "bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Camera className="size-3.5" />
+              <span>Bảng Tin 💕</span>
+            </button>
+          </div>
+        </div>
+
         {/* New Chat & Food Decider */}
         <SidebarGroup>
           <SidebarGroupContent className="space-y-2">

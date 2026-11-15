@@ -4,6 +4,7 @@ import type { Message } from "@/types/chat";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useAuthStore } from "./useAuthStore";
+import { usePostStore } from "./usePostStore";
 import { toast } from "sonner";
 
 let sseConnection: EventSource | null = null;
@@ -18,15 +19,18 @@ export const useChatStore = create<ChatState>()(
       friends: [],
       friendRequests: { sent: [], received: [] },
       isFoodRouletteOpen: false,
+      currentTab: "chat",
       loading: false,
 
       setActiveConversation: (id) => {
-        set({ activeConversationId: id });
+        set({ activeConversationId: id, currentTab: "chat" });
         if (id) {
           get().fetchMessages(id);
           get().markConversationAsSeen(id);
         }
       },
+
+      setCurrentTab: (tab: "chat" | "feed") => set({ currentTab: tab }),
 
       setFoodRouletteOpen: (open) => set({ isFoodRouletteOpen: open }),
 
@@ -46,6 +50,7 @@ export const useChatStore = create<ChatState>()(
           friends: [],
           friendRequests: { sent: [], received: [] },
           isFoodRouletteOpen: false,
+          currentTab: "chat",
           loading: false,
         });
       },
@@ -337,6 +342,21 @@ export const useChatStore = create<ChatState>()(
                 get().fetchFriends();
                 get().fetchConversations();
                 toast.success("🎉 Hai bạn đã trở thành bạn bè! Có thể nhắn tin ngay 💕");
+                return;
+              }
+
+              if (
+                ["new_post", "post_reaction", "new_comment", "delete_post"].includes(
+                  payload.type
+                )
+              ) {
+                usePostStore.getState().handleSseEvent(payload);
+                if (payload.type === "new_post") {
+                  const currentUserId = useAuthStore.getState().user?._id;
+                  if (payload.post?.authorId?._id !== currentUserId) {
+                    toast.info("📸 Người yêu vừa đăng bài viết mới lên Nhật ký! 💕");
+                  }
+                }
                 return;
               }
 

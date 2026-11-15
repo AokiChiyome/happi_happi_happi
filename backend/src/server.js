@@ -13,6 +13,7 @@ import messageRoute from "./routes/messageRoute.js";
 import cors from "cors";
 import conversationRoute from "./routes/conversationRoute.js";
 import coupleRoute from "./routes/coupleRoute.js";
+import postRoute from "./routes/postRoute.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, "../.env") });
@@ -121,13 +122,14 @@ app.use("/api/couple", protectedRoute, coupleRoute);
 app.use("/api/friends", protectedRoute, friendRoute);
 app.use("/api/messages", protectedRoute, messageRoute);
 app.use("/api/conversations", protectedRoute, conversationRoute);
+app.use("/api/posts", protectedRoute, postRoute);
 
 // Phục vụ Frontend Static nếu đã build (Production) hoặc trang thông báo thân thiện (Development)
 const distPath = path.join(__dirname, "../../frontend/dist");
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
-  app.get("*", (req, res, next) => {
-    if (req.path.startsWith("/api/")) return next();
+  app.use((req, res, next) => {
+    if (req.method !== "GET" || req.path.startsWith("/api/")) return next();
     res.sendFile(path.join(distPath, "index.html"));
   });
 } else {

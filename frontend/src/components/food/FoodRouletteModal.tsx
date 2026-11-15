@@ -7,7 +7,8 @@ import {
 import { useChatStore } from "@/stores/useChatStore";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Dices, RotateCcw, MapPin, Send, ArrowRight } from "lucide-react";
+import { Sparkles, Dices, RotateCcw, MapPin, Send, ArrowRight, Camera } from "lucide-react";
+import { usePostStore } from "@/stores/usePostStore";
 import { toast } from "sonner";
 
 // Web Audio API Sound Generator
@@ -70,8 +71,13 @@ class SoundFX {
 const sfx = new SoundFX();
 
 export const FoodRouletteModal: React.FC = () => {
-  const { isFoodRouletteOpen, setFoodRouletteOpen, sendFoodCard, activeConversationId } =
-    useChatStore();
+  const {
+    isFoodRouletteOpen,
+    setFoodRouletteOpen,
+    sendFoodCard,
+    activeConversationId,
+    setCurrentTab,
+  } = useChatStore();
 
   const [stage, setStage] = useState<1 | 2>(1); // 1: Category, 2: Dish
   const [selectedCategory, setSelectedCategory] = useState<string>("");
@@ -254,6 +260,23 @@ export const FoodRouletteModal: React.FC = () => {
     setFoodRouletteOpen(false);
   };
 
+  const handlePostToFeed = async () => {
+    if (!winningDish) return;
+    const ok = await usePostStore.getState().createPost({
+      content: `Hôm nay chúng mình ăn món "${winningDish.name}" nhé! Kèo này chốt hạ không đổi nha người yêu ơi! 🍽️😋`,
+      foodDish: {
+        name: winningDish.name,
+        category: winningDish.category,
+        emoji: winningDish.emoji,
+      },
+      feeling: "🤤 Đang thèm ăn",
+    });
+    if (ok) {
+      setFoodRouletteOpen(false);
+      setCurrentTab("feed");
+    }
+  };
+
   return (
     <Dialog open={isFoodRouletteOpen} onOpenChange={setFoodRouletteOpen}>
       <DialogContent className="max-w-2xl bg-card border-border shadow-2xl p-6 rounded-3xl">
@@ -309,10 +332,16 @@ export const FoodRouletteModal: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <Button
+                onClick={handlePostToFeed}
+                className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-bold gap-2 rounded-xl shadow-xs"
+              >
+                <Camera className="size-4" /> Đăng Lên Bảng Tin Cặp Đôi 💕
+              </Button>
               {activeConversationId && (
                 <Button
                   onClick={handleSendToChat}
-                  className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-bold gap-2 rounded-xl"
+                  className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-bold gap-2 rounded-xl shadow-xs"
                 >
                   <Send className="size-4" /> Gửi Vào Chat Này 💌
                 </Button>

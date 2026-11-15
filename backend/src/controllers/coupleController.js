@@ -250,9 +250,45 @@ export const streamMessages = (req, res) => {
     } catch (e) {}
   };
 
+  const onNewPost = (data) => {
+    try {
+      if (data.participantIds?.includes(userId)) {
+        res.write(`data: ${JSON.stringify({ type: "new_post", ...data })}\n\n`);
+      }
+    } catch (e) {}
+  };
+
+  const onPostReaction = (data) => {
+    try {
+      if (data.participantIds?.includes(userId)) {
+        res.write(`data: ${JSON.stringify({ type: "post_reaction", ...data })}\n\n`);
+      }
+    } catch (e) {}
+  };
+
+  const onNewComment = (data) => {
+    try {
+      if (data.participantIds?.includes(userId)) {
+        res.write(`data: ${JSON.stringify({ type: "new_comment", ...data })}\n\n`);
+      }
+    } catch (e) {}
+  };
+
+  const onDeletePost = (data) => {
+    try {
+      if (data.participantIds?.includes(userId)) {
+        res.write(`data: ${JSON.stringify({ type: "delete_post", ...data })}\n\n`);
+      }
+    } catch (e) {}
+  };
+
   chatEmitter.on("new_message", onMessage);
   chatEmitter.on("new_friend_request", onFriendRequest);
   chatEmitter.on("friend_request_accepted", onFriendAccepted);
+  chatEmitter.on("new_post", onNewPost);
+  chatEmitter.on("post_reaction", onPostReaction);
+  chatEmitter.on("new_comment", onNewComment);
+  chatEmitter.on("delete_post", onDeletePost);
 
   // Heartbeat định kỳ 20s để không bị ngắt kết nối
   const interval = setInterval(() => {
@@ -266,5 +302,9 @@ export const streamMessages = (req, res) => {
     chatEmitter.off("new_message", onMessage);
     chatEmitter.off("new_friend_request", onFriendRequest);
     chatEmitter.off("friend_request_accepted", onFriendAccepted);
+    chatEmitter.off("new_post", onNewPost);
+    chatEmitter.off("post_reaction", onPostReaction);
+    chatEmitter.off("new_comment", onNewComment);
+    chatEmitter.off("delete_post", onDeletePost);
   });
 };
