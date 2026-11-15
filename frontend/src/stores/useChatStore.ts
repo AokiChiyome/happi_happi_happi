@@ -22,6 +22,7 @@ export const useChatStore = create<ChatState>()(
       isFoodRouletteOpen: false,
       currentTab: "chat",
       loading: false,
+      typingStatus: {},
 
       setActiveConversation: (id) => {
         set({ activeConversationId: id, currentTab: "chat" });
@@ -34,6 +35,10 @@ export const useChatStore = create<ChatState>()(
       setCurrentTab: (tab: "chat" | "feed") => set({ currentTab: tab }),
 
       setFoodRouletteOpen: (open) => set({ isFoodRouletteOpen: open }),
+
+      sendTyping: (conversationId: string, isTyping: boolean) => {
+        chatService.setTyping(conversationId, isTyping);
+      },
 
       reset: () => {
         if (sseConnection) {
@@ -53,6 +58,7 @@ export const useChatStore = create<ChatState>()(
           isFoodRouletteOpen: false,
           currentTab: "chat",
           loading: false,
+          typingStatus: {},
         });
       },
 
@@ -94,6 +100,64 @@ export const useChatStore = create<ChatState>()(
           (c) => c._id === activeConversationId
         );
 
+        const currentUser = useAuthStore.getState().user;
+        const targetConvoId = activeConversationId || "";
+        const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+        const nowIso = new Date().toISOString();
+
+        // 1. OPTIMISTIC UI: Hiển thị ngay lập tức không có độ trễ (0ms latency)
+        if (targetConvoId) {
+          const optimisticMsg: Message = {
+            _id: tempId,
+            conversationId: targetConvoId,
+            senderId: currentUser?._id || "me",
+            content: content || null,
+            imgURL: imgURL || undefined,
+            createdAt: nowIso,
+            sender: {
+              _id: currentUser?._id || "me",
+              displayName: currentUser?.displayName || "Tôi",
+              avatarUrl: currentUser?.avatarUrl,
+            },
+          };
+
+          set((state) => {
+            const prevItems = state.messages[targetConvoId]?.items || [];
+            const updatedConversations = state.conversations.map((c) =>
+              c._id === targetConvoId
+                ? {
+                    ...c,
+                    lastMessage: {
+                      _id: tempId,
+                      content: content || (imgURL ? "[Nhãn dán]" : ""),
+                      createdAt: nowIso,
+                    },
+                    lastMessageAt: nowIso,
+                  }
+                : c
+            );
+
+            return {
+              messages: {
+                ...state.messages,
+                [targetConvoId]: {
+                  items: [...prevItems, optimisticMsg],
+                  hasMore: state.messages[targetConvoId]?.hasMore ?? false,
+                  nextCursor: state.messages[targetConvoId]?.nextCursor ?? null,
+                },
+              },
+              conversations: updatedConversations.sort(
+                (a, b) =>
+                  new Date(b.lastMessageAt || b.createdAt || 0).getTime() -
+                  new Date(a.lastMessageAt || a.createdAt || 0).getTime()
+              ),
+            };
+          });
+
+          // Tắt trạng thái đang gõ ngay khi gửi
+          get().sendTyping(targetConvoId, false);
+        }
+
         try {
           let res: { message: Message };
           if (activeConvo?.type === "group" && activeConversationId) {
@@ -113,15 +177,20 @@ export const useChatStore = create<ChatState>()(
 
           if (res?.message) {
             const msg = res.message;
-            const targetConvoId = msg.conversationId;
+            const finalConvoId = msg.conversationId || targetConvoId;
 
             set((state) => {
-              const prevItems = state.messages[targetConvoId]?.items || [];
-              const exists = prevItems.some((m) => m._id === msg._id);
-              const newItems = exists ? prevItems : [...prevItems, msg];
+              const prevItems = state.messages[finalConvoId]?.items || [];
+              // Thay thế tempMsg bằng tin nhắn thật từ server
+              const newItems = prevItems.map((m) =>
+                m._id === tempId ? msg : m
+              );
+              if (!newItems.some((m) => m._id === msg._id)) {
+                newItems.push(msg);
+              }
 
               const updatedConversations = state.conversations.map((c) =>
-                c._id === targetConvoId
+                c._id === finalConvoId
                   ? {
                       ...c,
                       lastMessage: {
@@ -137,11 +206,11 @@ export const useChatStore = create<ChatState>()(
               return {
                 messages: {
                   ...state.messages,
-                  [targetConvoId]: {
+                  [finalConvoId]: {
                     items: newItems,
-                    hasMore: state.messages[targetConvoId]?.hasMore ?? false,
+                    hasMore: state.messages[finalConvoId]?.hasMore ?? false,
                     nextCursor:
-                      state.messages[targetConvoId]?.nextCursor ?? null,
+                      state.messages[finalConvoId]?.nextCursor ?? null,
                   },
                 },
                 conversations: updatedConversations.sort(
@@ -154,6 +223,19 @@ export const useChatStore = create<ChatState>()(
           }
         } catch (error) {
           console.error("Lỗi gửi tin nhắn", error);
+          if (targetConvoId) {
+            set((state) => ({
+              messages: {
+                ...state.messages,
+                [targetConvoId]: {
+                  ...state.messages[targetConvoId],
+                  items: (state.messages[targetConvoId]?.items || []).filter(
+                    (m) => m._id !== tempId
+                  ),
+                },
+              },
+            }));
+          }
           toast.error("Không thể gửi tin nhắn");
         }
       },
@@ -329,20 +411,53 @@ export const useChatStore = create<ChatState>()(
           if (syncInterval) {
             clearInterval(syncInterval);
           }
-          // Chế độ đồng bộ thông minh mỗi 4s: Bảo đảm tin nhắn và hội thoại luôn cập nhật trên cả Vercel Serverless
+          // Chế độ đồng bộ siêu tốc mỗi 2s bảo đảm tin nhắn luôn đồng bộ cả khi kết nối mạng chập chờn
           syncInterval = setInterval(() => {
             const { activeConversationId } = get();
             if (activeConversationId) {
               get().fetchMessages(activeConversationId);
             }
             get().fetchConversations();
-          }, 4000);
+          }, 2000);
 
           sseConnection = new EventSource(streamUrl);
 
           sseConnection.onmessage = (event) => {
             try {
               const payload = JSON.parse(event.data);
+
+              if (payload.type === "typing") {
+                set((state) => ({
+                  typingStatus: {
+                    ...state.typingStatus,
+                    [payload.conversationId]: {
+                      userId: payload.userId,
+                      displayName: payload.displayName || "Người yêu",
+                      isTyping: Boolean(payload.isTyping),
+                    },
+                  },
+                }));
+                return;
+              }
+
+              if (payload.type === "message_seen") {
+                const convoId = payload.conversationId;
+                set((state) => ({
+                  conversations: state.conversations.map((c) =>
+                    c._id === convoId
+                      ? {
+                          ...c,
+                          unreadCounts: {
+                            ...c.unreadCounts,
+                            [payload.userId]: 0,
+                          },
+                        }
+                      : c
+                  ),
+                }));
+                return;
+              }
+
               if (payload.type === "friend_request") {
                 get().fetchFriendRequests();
                 toast.info("💌 Bạn vừa nhận được một lời mời kết bạn mới!");
@@ -436,6 +551,14 @@ export const useChatStore = create<ChatState>()(
                         items: updatedItems,
                         hasMore: state.messages[convoId]?.hasMore ?? false,
                         nextCursor: state.messages[convoId]?.nextCursor ?? null,
+                      },
+                    },
+                    typingStatus: {
+                      ...state.typingStatus,
+                      [convoId]: {
+                        userId: msg.senderId,
+                        displayName: payload.sender?.displayName || "Người yêu",
+                        isTyping: false,
                       },
                     },
                     conversations: updatedConvos.sort(

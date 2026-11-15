@@ -28,5 +28,18 @@
     "fullstack"
   ],
   "author": "AokiChiyome",
-  "license": "ISC"
+  "license": "ISC",
+  "main": "dev.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AokiChiyome/happi_happi_happi.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AokiChiyome/happi_happi_happi/issues"
+  },
+  "homepage": "https://github.com/AokiChiyome/happi_happi_happi#readme",
+  "devDependencies": {}
 }

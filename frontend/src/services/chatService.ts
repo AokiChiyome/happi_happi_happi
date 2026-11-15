@@ -105,4 +105,10 @@ export const chatService = {
     });
     return res.data;
   },
+
+  async setTyping(conversationId: string, isTyping: boolean) {
+    try {
+      await api.post("/messages/typing", { conversationId, isTyping });
+    } catch (e) {}
+  },
 };

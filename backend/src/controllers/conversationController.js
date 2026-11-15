@@ -1,6 +1,7 @@
 import Conversation from "../models/Conversation.js";
 import Message from "../models/Message.js";
 import mongoose from "mongoose";
+import { chatEmitter } from "../libs/eventBus.js";
 
 export const createConversation = async (req, res) => {
   try {
@@ -260,6 +261,13 @@ export const markAsSeen = async (req, res) => {
         new: true,
       }
     );
+
+    const participantIds = conversation.participants?.map((p) => p.userId?.toString()) || [];
+    chatEmitter.emit("message_seen", {
+      conversationId,
+      userId,
+      participantIds,
+    });
 
     return res.status(200).json({
       message: "Đã đánh dấu đã đọc",

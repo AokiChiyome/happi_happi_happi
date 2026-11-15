@@ -214,30 +214,59 @@ export const shareDish = async (req, res) => {
 export const streamMessages = (req, res) => {
   const userId = req.user._id.toString();
 
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
+  // Vô hiệu hóa Nagle Algorithm để dữ liệu gửi đi TỨC THÌ (Zero Delay)
+  try {
+    req.socket?.setNoDelay?.(true);
+    req.socket?.setKeepAlive?.(true, 10000);
+  } catch (e) {}
+
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no"); // Ngăn chặn buffering ở Vercel, Cloudflare, Nginx
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.flushHeaders?.();
 
   // Gửi sự kiện kết nối ban đầu
   res.write(`data: ${JSON.stringify({ type: "connected", userId })}\n\n`);
+  res.flush?.();
 
   const onMessage = (data) => {
     try {
       // BẢO VỆ DỮ LIỆU: Chỉ gửi tin nhắn nếu user hiện tại thực sự là người nhận hoặc người gửi trong hội thoại!
       if (!data.participantIds || data.participantIds.includes(userId)) {
         res.write(`data: ${JSON.stringify({ type: "message", ...data })}\n\n`);
+        res.flush?.();
       }
     } catch (e) {
       console.error("Lỗi gửi qua SSE stream:", e);
     }
   };
 
+  const onTyping = (data) => {
+    try {
+      // Chỉ gửi trạng thái gõ cho đối phương (không gửi lại cho chính người đang gõ)
+      if (data.participantIds?.includes(userId) && data.userId !== userId) {
+        res.write(`data: ${JSON.stringify({ type: "typing", ...data })}\n\n`);
+        res.flush?.();
+      }
+    } catch (e) {}
+  };
+
+  const onMessageSeen = (data) => {
+    try {
+      if (data.participantIds?.includes(userId)) {
+        res.write(`data: ${JSON.stringify({ type: "message_seen", ...data })}\n\n`);
+        res.flush?.();
+      }
+    } catch (e) {}
+  };
+
   const onFriendRequest = (data) => {
     try {
       if (data.toUserId === userId) {
         res.write(`data: ${JSON.stringify({ type: "friend_request", ...data })}\n\n`);
+        res.flush?.();
       }
     } catch (e) {}
   };
@@ -246,6 +275,7 @@ export const streamMessages = (req, res) => {
     try {
       if (data.userA === userId || data.userB === userId) {
         res.write(`data: ${JSON.stringify({ type: "friend_accepted", ...data })}\n\n`);
+        res.flush?.();
       }
     } catch (e) {}
   };
@@ -254,6 +284,7 @@ export const streamMessages = (req, res) => {
     try {
       if (data.participantIds?.includes(userId)) {
         res.write(`data: ${JSON.stringify({ type: "new_post", ...data })}\n\n`);
+        res.flush?.();
       }
     } catch (e) {}
   };
@@ -262,6 +293,7 @@ export const streamMessages = (req, res) => {
     try {
       if (data.participantIds?.includes(userId)) {
         res.write(`data: ${JSON.stringify({ type: "post_reaction", ...data })}\n\n`);
+        res.flush?.();
       }
     } catch (e) {}
   };
@@ -270,6 +302,7 @@ export const streamMessages = (req, res) => {
     try {
       if (data.participantIds?.includes(userId)) {
         res.write(`data: ${JSON.stringify({ type: "new_comment", ...data })}\n\n`);
+        res.flush?.();
       }
     } catch (e) {}
   };
@@ -278,11 +311,14 @@ export const streamMessages = (req, res) => {
     try {
       if (data.participantIds?.includes(userId)) {
         res.write(`data: ${JSON.stringify({ type: "delete_post", ...data })}\n\n`);
+        res.flush?.();
       }
     } catch (e) {}
   };
 
   chatEmitter.on("new_message", onMessage);
+  chatEmitter.on("typing", onTyping);
+  chatEmitter.on("message_seen", onMessageSeen);
   chatEmitter.on("new_friend_request", onFriendRequest);
   chatEmitter.on("friend_request_accepted", onFriendAccepted);
   chatEmitter.on("new_post", onNewPost);
@@ -290,16 +326,19 @@ export const streamMessages = (req, res) => {
   chatEmitter.on("new_comment", onNewComment);
   chatEmitter.on("delete_post", onDeletePost);
 
-  // Heartbeat định kỳ 20s để không bị ngắt kết nối
+  // Heartbeat định kỳ 15s để không bị ngắt kết nối
   const interval = setInterval(() => {
     try {
       res.write(`: ping\n\n`);
+      res.flush?.();
     } catch (e) {}
-  }, 20000);
+  }, 15000);
 
   req.on("close", () => {
     clearInterval(interval);
     chatEmitter.off("new_message", onMessage);
+    chatEmitter.off("typing", onTyping);
+    chatEmitter.off("message_seen", onMessageSeen);
     chatEmitter.off("new_friend_request", onFriendRequest);
     chatEmitter.off("friend_request_accepted", onFriendAccepted);
     chatEmitter.off("new_post", onNewPost);

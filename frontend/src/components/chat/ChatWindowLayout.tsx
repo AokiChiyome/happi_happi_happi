@@ -28,11 +28,14 @@ export const ChatWindowLayout: React.FC = () => {
     sendMessage,
     sendSticker,
     setFoodRouletteOpen,
+    typingStatus,
+    sendTyping,
   } = useChatStore();
 
   const [inputContent, setInputContent] = useState("");
   const [showStickerPicker, setShowStickerPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<any>(null);
 
   const activeConvo = conversations.find(
     (c) => c._id === activeConversationId
@@ -47,6 +50,10 @@ export const ChatWindowLayout: React.FC = () => {
       ? activeConvo.participants.find((p) => p._id !== user._id)
       : null;
 
+  const currentTyping = activeConversationId
+    ? typingStatus[activeConversationId]
+    : null;
+
   const chatTitle =
     activeConvo?.type === "group"
       ? activeConvo.group?.name || "Nhóm Chat"
@@ -55,15 +62,34 @@ export const ChatWindowLayout: React.FC = () => {
   const chatAvatar =
     activeConvo?.type === "group" ? undefined : otherUser?.avatarUrl || undefined;
 
-  // Auto-scroll on new message
+  // Auto-scroll on new message or when other user is typing
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [currentMessages.length]);
+  }, [currentMessages.length, currentTyping?.isTyping]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInputContent(val);
+
+    if (!activeConversationId) return;
+    sendTyping(activeConversationId, true);
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      if (activeConversationId) {
+        sendTyping(activeConversationId, false);
+      }
+    }, 2000);
+  };
 
   const handleSend = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const text = inputContent.trim();
     if (!text || !activeConversationId) return;
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    sendTyping(activeConversationId, false);
+
     setInputContent("");
     sendMessage(text, otherUser?._id);
   };
@@ -299,7 +325,7 @@ export const ChatWindowLayout: React.FC = () => {
                         isMine ? "text-right" : "text-left"
                       }`}
                     >
-                      {timeStr}
+                      {msg._id.startsWith("temp-") ? "Đang gửi... ✨" : timeStr}
                     </span>
                   </div>
                 )}
@@ -307,6 +333,24 @@ export const ChatWindowLayout: React.FC = () => {
             );
           })
         )}
+
+        {/* Typing indicator bubble */}
+        {currentTyping?.isTyping && currentTyping.userId !== user?._id && (
+          <div className="flex items-end gap-2.5 my-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <div className="size-8 rounded-full bg-pink-100 dark:bg-pink-950/40 text-pink-500 flex items-center justify-center text-xs font-bold border border-pink-200">
+              💕
+            </div>
+            <div className="bg-muted/80 backdrop-blur-sm px-4 py-2.5 rounded-2xl rounded-bl-sm border border-border/50 flex items-center gap-1.5 shadow-xs">
+              <span className="text-xs text-muted-foreground font-medium mr-1">
+                {currentTyping.displayName || "Người yêu"} đang soạn tin
+              </span>
+              <span className="size-1.5 bg-pink-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+              <span className="size-1.5 bg-pink-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+              <span className="size-1.5 bg-pink-500 rounded-full animate-bounce" />
+            </div>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -366,7 +410,7 @@ export const ChatWindowLayout: React.FC = () => {
 
           <Input
             value={inputContent}
-            onChange={(e) => setInputContent(e.target.value)}
+            onChange={handleInputChange}
             placeholder={`Nhắn tin cho ${chatTitle}...`}
             className="flex-1 bg-muted/30 border-border/80 rounded-2xl px-4 py-2 text-sm focus-visible:ring-primary/40"
           />

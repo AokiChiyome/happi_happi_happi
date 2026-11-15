@@ -172,3 +172,37 @@ export const sendGroupMessage = async (req, res) => {
     return res.status(500).json({ message: "Lỗi hệ thống khi gửi tin nhắn nhóm" });
   }
 };
+
+export const setTypingStatus = async (req, res) => {
+  try {
+    const { conversationId, isTyping } = req.body;
+    const userId = req.user._id.toString();
+
+    if (!conversationId || !mongoose.Types.ObjectId.isValid(conversationId)) {
+      return res.status(400).json({ message: "Mã cuộc trò chuyện không hợp lệ" });
+    }
+
+    const conversation = await Conversation.findById(conversationId).select("participants");
+    if (!conversation) {
+      return res.status(404).json({ message: "Cuộc trò chuyện không tồn tại" });
+    }
+
+    const participantIds = conversation.participants.map((p) => p.userId.toString());
+    if (!participantIds.includes(userId)) {
+      return res.status(403).json({ message: "Không có quyền" });
+    }
+
+    chatEmitter.emit("typing", {
+      conversationId,
+      userId,
+      displayName: req.user.displayName,
+      isTyping: Boolean(isTyping),
+      participantIds,
+    });
+
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error("Lỗi cập nhật trạng thái typing:", error);
+    return res.status(500).json({ message: "Lỗi hệ thống typing" });
+  }
+};

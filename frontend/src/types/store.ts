@@ -44,6 +44,7 @@ export interface ChatState {
   isFoodRouletteOpen: boolean;
   currentTab: "chat" | "feed";
   loading: boolean;
+  typingStatus: Record<string, { userId: string; displayName: string; isTyping: boolean }>;
 
   reset: () => void;
   setActiveConversation: (id: string | null) => void;
@@ -75,4 +76,5 @@ export interface ChatState {
   declineFriendRequest: (requestId: string) => Promise<void>;
   createGroupChat: (name: string, memberIds: string[]) => Promise<void>;
   initRealtimeStream: () => void;
+  sendTyping: (conversationId: string, isTyping: boolean) => void;
 }
