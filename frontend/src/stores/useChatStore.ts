@@ -31,10 +31,18 @@ export const useChatStore = create<ChatState>()(
         if (id) {
           get().fetchMessages(id);
           get().markConversationAsSeen(id);
+          // Khi đã vào phòng chat rồi thì không hiển thị bong bóng chat
+          useNotificationStore.getState().hideChatHead();
         }
       },
 
-      setCurrentTab: (tab: "chat" | "feed") => set({ currentTab: tab }),
+      setCurrentTab: (tab: "chat" | "feed") => {
+        set({ currentTab: tab });
+        if (tab === "chat") {
+          // Khi đã vào giao diện chat rồi thì không hiển thị bong bóng chat
+          useNotificationStore.getState().hideChatHead();
+        }
+      },
 
       setFoodRouletteOpen: (open) => set({ isFoodRouletteOpen: open }),
 
@@ -871,8 +879,9 @@ export const useChatStore = create<ChatState>()(
                     const senderName =
                       payload.sender?.displayName || "Người yêu";
                     const senderAvatar = payload.sender?.avatarUrl;
+                    const isTabVisible = typeof document !== "undefined" ? !document.hidden : true;
                     const isLookingAtChat =
-                      isCurrentActive && get().currentTab === "chat";
+                      isCurrentActive && get().currentTab === "chat" && isTabVisible;
 
                     if (!isLookingAtChat) {
                       useNotificationStore.getState().showBubble({

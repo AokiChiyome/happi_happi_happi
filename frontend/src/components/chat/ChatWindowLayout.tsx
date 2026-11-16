@@ -453,25 +453,6 @@ export const ChatWindowLayout: React.FC = () => {
             <Bookmark className="size-4" />
           </Button>
 
-          {/* Nút Bật/Tắt Bong Bóng Chat Nổi (Messenger Chat Head) */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleChatHead}
-            className={`size-8 rounded-full transition-colors ${
-              isChatHeadVisible
-                ? "bg-pink-500/20 text-pink-600 dark:text-pink-400"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-            title={
-              isChatHeadVisible
-                ? "Bong bóng chat đang BẬT (Bấm để ẩn)"
-                : "Bật bong bóng chat nổi (Messenger Style)"
-            }
-          >
-            <MessageCircle className="size-4" />
-          </Button>
-
           {/* Menu Tùy Chọn Nâng Cao: Cấp quyền thông báo, Thử bong bóng chat */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

@@ -37,17 +37,10 @@ interface NotificationState {
   triggerSampleNotification: (sampleSender?: string, sampleContent?: string) => Promise<void>;
 }
 
-// Lưu trạng thái bật/tắt bong bóng chat của người dùng vào localStorage
-const getSavedChatHeadState = (): boolean => {
-  if (typeof window === "undefined") return true;
-  const saved = localStorage.getItem("happi_chat_head_enabled");
-  return saved === null ? true : saved === "true";
-};
-
 export const useNotificationStore = create<NotificationState>((set, get) => ({
   activeBubble: null,
   isBubbleVisible: false,
-  isChatHeadVisible: getSavedChatHeadState(),
+  isChatHeadVisible: false, // Mặc định không hiển thị liên tục, chỉ bung lên khi có tin nhắn mới mà người dùng đang không ở trong đoạn chat
   unreadCount: 0,
   isMiniChatOpen: false,
   soundEnabled: true,

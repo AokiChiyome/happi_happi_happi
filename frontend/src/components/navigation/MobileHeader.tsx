@@ -40,23 +40,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5">
-        {/* Nút Bật/Tắt Bong Bóng Chat Nổi */}
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={toggleChatHead}
-          className={`size-8 rounded-full transition-colors ${
-            isChatHeadVisible
-              ? "bg-pink-500/20 text-pink-600 dark:text-pink-400"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-          title={isChatHeadVisible ? "Bong bóng chat đang bật" : "Bật bong bóng chat"}
-        >
-          <MessageCircle className="size-4" />
-        </Button>
-
+      <div className="flex items-center gap-2">
         {/* Nút Cài đặt App PWA: CHỈ hiển thị nếu chưa cài đặt để không làm phiền người dùng */}
         {!isInstalled && !isStandalone && (
           <Button
